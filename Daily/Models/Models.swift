@@ -68,16 +68,44 @@ final class Recipe {
     var slotRaw: String
     var note: String
     var createdAt: Date
+    /// One ingredient per line, e.g. "2 lb chicken thighs".
+    var ingredientsRaw: String = ""
 
-    init(name: String, servings: Int, slot: MealSlot, note: String = "") {
+    init(name: String, servings: Int, slot: MealSlot, note: String = "", ingredients: String = "") {
         self.name = name
         self.servings = servings
         self.slotRaw = slot.rawValue
         self.note = note
         self.createdAt = .now
+        self.ingredientsRaw = ingredients
     }
 
     var slot: MealSlot { MealSlot(rawValue: slotRaw) ?? .dinner }
+
+    var ingredients: [String] {
+        ingredientsRaw.split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+/// What you plan to eat for a meal on a given day (a recipe name, or "Eat out").
+@Model
+final class MealPlan {
+    var dayKey: String
+    var slotRaw: String
+    var title: String
+
+    init(dayKey: String, slot: MealSlot, title: String) {
+        self.dayKey = dayKey
+        self.slotRaw = slot.rawValue
+        self.title = title
+    }
+
+    var slot: MealSlot { MealSlot(rawValue: slotRaw) ?? .dinner }
+    var isEatingOut: Bool { title == MealPlan.eatOut }
+
+    static let eatOut = "Eat out"
 }
 
 @Model

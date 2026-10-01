@@ -25,13 +25,20 @@ and Settings → General → VPN & Device Management → trust your developer ce
   cardio minutes, workout history, and a "wrap up by" banner for the Caltrain on gym days.
 - **Your own events** — the + button on Today adds one-off or repeating events (daily, weekdays, weekly).
 - **Reminders** — turn on in Commute: 10 min before each departure and your events, plus Sunday prep and wind-down.
-- Timeline shows free gaps of 90+ minutes; water has a 100 oz goal (change in `MySchedule`).
+- **Settings** (gear on Commute) — shuttle times and stop, walk times, gym-day timing, your Caltrain
+  station and the trains you take, your daily times, goals and reminder lead time.
+- **Plan the week** (calendar button on Today, or Food → Plan & groceries) — set each day's type,
+  see the gym rotation and commute, pick lunches/dinners from your recipes, and send the planned
+  recipes' ingredients to the grocery list.
+- **Tomorrow** card on Today after 5 PM — first departure and leave-by time, gym bag, lunch, events.
+- Timeline shows free gaps of 90+ minutes, leave-by times, and planned meals.
 
 All data stays on the phone (SwiftData). Light and dark mode follow the system setting.
 
 ## Your schedule
 
-Times live in `Daily/Schedule/Schedule.swift` (`MySchedule`). Caltrain times are estimates for now.
+Change everything in the app under Commute → gear. Defaults live in `Pref` in `Daily/Schedule/Schedule.swift`.
+Caltrain uses the train times you add in Settings; until then it shows estimates (marked ~).
 
 ## Next up
 

@@ -15,6 +15,7 @@ struct DailyApp: App {
             BlockCheck.self,
             DayTypeOverride.self,
             CustomEvent.self,
+            MealPlan.self,
             WorkoutTemplate.self,
             WorkoutSession.self,
             SetLog.self
@@ -28,13 +29,14 @@ struct RootView: View {
     @Query private var events: [CustomEvent]
     @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
     @AppStorage("remindersOn") private var remindersOn = false
+    @AppStorage(Pref.revision) private var revision = 0
 
     /// Changes whenever anything that affects reminders changes.
     private var reminderKey: String {
         let o = overrides.map { $0.dayKey + $0.typeRaw }.sorted().joined(separator: ",")
         let e = events.map { "\($0.id)\($0.start.timeIntervalSince1970)\($0.repeatRaw)\($0.remind)\($0.title)" }
             .sorted().joined(separator: ",")
-        return "\(remindersOn)|\(pattern)|\(o)|\(e)"
+        return "\(remindersOn)|\(revision)|\(pattern)|\(o)|\(e)"
     }
 
     var body: some View {

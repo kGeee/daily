@@ -38,9 +38,11 @@ enum Reminders {
                 let body: String
 
                 if block.isDeparture {
-                    fire = block.start.addingTimeInterval(-lead)
-                    title = block.title
-                    body = "Leave in \(MySchedule.reminderLeadMinutes) min · " + block.start.formatted(date: .omitted, time: .shortened)
+                    let leaveAt = block.leaveBy ?? block.start
+                    fire = leaveAt.addingTimeInterval(-lead)
+                    title = block.title + " · " + block.start.formatted(date: .omitted, time: .shortened)
+                    body = "Leave by " + leaveAt.formatted(date: .omitted, time: .shortened)
+                        + (block.subtitle.isEmpty ? "" : " · " + block.subtitle)
                 } else if block.eventID != nil {
                     fire = block.start.addingTimeInterval(-lead)
                     title = block.title
@@ -52,7 +54,9 @@ enum Reminders {
                 } else if block.id == "wind" {
                     fire = block.start
                     title = "Time to wind down"
-                    body = "Phone down, bed by 11:30."
+                    let tomorrow = cal.date(byAdding: .day, value: 1, to: day) ?? day
+                    let bed = "Phone down, bed by " + MySchedule.bedtime.label + "."
+                    body = planner.type(for: tomorrow) == .gym ? "Gym tomorrow: pack your gym bag. " + bed : bed
                 } else {
                     continue
                 }

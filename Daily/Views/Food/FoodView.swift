@@ -39,13 +39,20 @@ struct LogDraft: Identifiable {
     let id = UUID()
     var slot: MealSlot
     var source: MealSource
+    var name: String = ""
 }
 
 struct FoodTodaySection: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \FoodEntry.date) private var entries: [FoodEntry]
     @Query(sort: \Recipe.createdAt) private var recipes: [Recipe]
+    @Query private var plans: [MealPlan]
     @State private var draft: LogDraft?
+
+    private func plan(for slot: MealSlot) -> MealPlan? {
+        let key = DayKey.of(Date())
+        return plans.first { $0.dayKey == key && $0.slot == slot }
+    }
 
     private var todays: [FoodEntry] {
         entries.filter { Calendar.current.isDateInToday($0.date) }
@@ -132,9 +139,28 @@ struct FoodTodaySection: View {
                         .padding(.top, 3)
                     VStack(alignment: .leading, spacing: 6) {
                         if items.isEmpty {
-                            Text("Not logged")
-                                .font(.subheadline)
-                                .foregroundStyle(Palette.faint)
+                            if let planned = plan(for: slot) {
+                                HStack(spacing: 8) {
+                                    Text("Planned: " + planned.title)
+                                        .font(.subheadline)
+                                        .foregroundStyle(Palette.muted)
+                                    Spacer(minLength: 4)
+                                    Button(planned.isEatingOut ? "Ate out" : "Ate it") {
+                                        context.insert(FoodEntry(slot: slot, name: planned.title,
+                                                                 source: planned.isEatingOut ? .out : .prepped))
+                                    }
+                                    .font(.caption.weight(.heavy))
+                                    .foregroundStyle(Palette.onAccent)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(planned.isEatingOut ? Palette.gym : Palette.food, in: Capsule())
+                                    .buttonStyle(.plain)
+                                }
+                            } else {
+                                Text("Not logged")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Palette.faint)
+                            }
                         }
                         ForEach(items) { entry in
                             HStack(spacing: 8) {
@@ -152,7 +178,11 @@ struct FoodTodaySection: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     Menu {
                         ForEach(MealSource.allCases) { source in
-                            Button(source.title) { draft = LogDraft(slot: slot, source: source) }
+                            Button(source.title) {
+                                let planned = plan(for: slot)
+                                let name = (planned != nil && planned?.isEatingOut == (source == .out)) ? (planned?.title ?? "") : ""
+                                draft = LogDraft(slot: slot, source: source, name: name == MealPlan.eatOut ? "" : name)
+                            }
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
@@ -210,6 +240,7 @@ struct LogMealSheet: View {
     @State private var protein = ""
 
     init(draft: LogDraft) {
+        _name = State(initialValue: draft.name)
         _slot = State(initialValue: draft.slot)
         _source = State(initialValue: draft.source)
     }

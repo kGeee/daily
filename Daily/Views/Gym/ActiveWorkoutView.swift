@@ -70,11 +70,12 @@ struct ActiveWorkoutView: View {
     }
 
     private var trainBanner: some View {
-        let train = MySchedule.caltrainAfterGym.on(session.date)
-        let wrapUp = train.addingTimeInterval(-20 * 60)
+        let pick = MySchedule.caltrainAfterGym
+        let train = pick.time.on(session.date)
+        let wrapUp = train.addingTimeInterval(-Double(MySchedule.gymToStationMinutes * 60))
         return HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Caltrain home · ~" + train.formatted(date: .omitted, time: .shortened))
+                Text("Caltrain home · " + (pick.isEstimate ? "~" : "") + train.formatted(date: .omitted, time: .shortened))
                     .font(.subheadline.weight(.bold))
                 Text("Wrap up by " + wrapUp.formatted(date: .omitted, time: .shortened) + " to make it")
                     .font(.caption)

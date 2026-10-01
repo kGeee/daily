@@ -13,6 +13,8 @@ struct GroceriesSection: View {
     @State private var newQuantity = ""
     @State private var newSection = "Produce"
     @State private var showAddRecipe = false
+    @State private var editingRecipe: Recipe?
+    @State private var showWeekPlan = false
 
     private var tripItems: [GroceryItem] { items.filter { $0.trip == trip } }
 
@@ -24,11 +26,33 @@ struct GroceriesSection: View {
             }
             .pickerStyle(.segmented)
 
+            Button {
+                showWeekPlan = true
+            } label: {
+                HStack {
+                    Image(systemName: "calendar")
+                    Text("Plan this week's meals")
+                        .font(.subheadline.weight(.bold))
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.caption.weight(.bold))
+                }
+                .foregroundStyle(Palette.foodText)
+                .padding(14)
+                .background(Palette.foodTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(.plain)
+
             recipesRow
             listCard
         }
         .sheet(isPresented: $showAddRecipe) {
-            AddRecipeSheet()
+            AddRecipeSheet(recipe: nil)
+        }
+        .sheet(item: $editingRecipe) { recipe in
+            AddRecipeSheet(recipe: recipe)
+        }
+        .sheet(isPresented: $showWeekPlan) {
+            WeekPlanView()
         }
     }
 
@@ -54,11 +78,18 @@ struct GroceriesSection: View {
                                     .foregroundStyle(Palette.foodText)
                                     .padding(.top, 4)
                             }
+                            Text(recipe.ingredients.isEmpty ? "No ingredients yet" : "\(recipe.ingredients.count) ingredients")
+                                .font(.caption2)
+                                .foregroundStyle(Palette.faint)
                         }
                         .frame(width: 120, alignment: .leading)
                         .padding(12)
                         .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .contentShape(Rectangle())
+                        .onTapGesture { editingRecipe = recipe }
                         .contextMenu {
+                            Button("Edit") { editingRecipe = recipe }
+                            Button("Add ingredients to this trip") { addIngredients(of: recipe) }
                             Button("Delete", role: .destructive) { context.delete(recipe) }
                         }
                     }
@@ -158,6 +189,15 @@ struct GroceriesSection: View {
         .card()
     }
 
+    private func addIngredients(of recipe: Recipe) {
+        let open = Set(tripItems.filter { !$0.isDone }.map { $0.name.lowercased() })
+        for line in recipe.ingredients {
+            let parsed = GroceryParser.parse(line)
+            guard !open.contains(parsed.name.lowercased()) else { continue }
+            context.insert(GroceryItem(name: parsed.name, quantity: parsed.quantity, section: parsed.section, trip: trip))
+        }
+    }
+
     private func addItem() {
         let name = newName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
@@ -212,14 +252,67 @@ struct GroceryRow: View {
     }
 }
 
+/// Turns a line like "2 lb chicken thighs" into a grocery item with a guessed store section.
+enum GroceryParser {
+    private static let units: Set<String> = [
+        "lb", "lbs", "oz", "g", "kg", "cup", "cups", "can", "cans", "tbsp", "tsp",
+        "bunch", "bunches", "clove", "cloves", "pack", "packs", "bag", "bags", "jar", "jars", "dozen", "head", "heads"
+    ]
+
+    static func parse(_ line: String) -> (name: String, quantity: String, section: String) {
+        let words = line.split(separator: " ").map(String.init)
+        var quantity: [String] = []
+        var index = 0
+        if let first = words.first, first.first?.isNumber == true {
+            quantity.append(first)
+            index = 1
+            if words.count > 1, units.contains(words[1].lowercased()) {
+                quantity.append(words[1])
+                index = 2
+            }
+        }
+        let rest = words.dropFirst(index).joined(separator: " ")
+        let name = rest.isEmpty ? line : rest.prefix(1).uppercased() + rest.dropFirst()
+        return (name, quantity.joined(separator: " "), section(for: name))
+    }
+
+    static func section(for name: String) -> String {
+        let n = name.lowercased()
+        let groups: [(String, [String])] = [
+            ("Protein", ["chicken", "beef", "turkey", "pork", "salmon", "fish", "shrimp", "tofu", "egg", "steak", "sausage", "tuna"]),
+            ("Dairy", ["milk", "cheese", "yogurt", "butter", "cream", "feta", "parmesan"]),
+            ("Frozen", ["frozen", "ice"]),
+            ("Produce", ["onion", "garlic", "pepper", "tomato", "lettuce", "spinach", "kale", "broccoli", "carrot",
+                         "potato", "cilantro", "lime", "lemon", "avocado", "cucumber", "zucchini", "mushroom",
+                         "apple", "banana", "berries", "ginger", "scallion", "celery", "cabbage", "herb", "basil"])
+        ]
+        for (section, words) in groups where words.contains(where: { n.contains($0) }) {
+            return section
+        }
+        return "Pantry"
+    }
+}
+
 struct AddRecipeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
-    @State private var name = ""
-    @State private var servings = 4
-    @State private var slot: MealSlot = .dinner
-    @State private var note = "Reheats well"
+    let recipe: Recipe?
+
+    @State private var name: String
+    @State private var servings: Int
+    @State private var slot: MealSlot
+    @State private var note: String
+    @State private var ingredients: String
+
+    init(recipe: Recipe?) {
+        self.recipe = recipe
+        _name = State(initialValue: recipe?.name ?? "")
+        _servings = State(initialValue: recipe?.servings ?? 4)
+        _slot = State(initialValue: recipe?.slot ?? .dinner)
+        _note = State(initialValue: recipe?.note ?? "Reheats well")
+        _ingredients = State(initialValue: recipe?.ingredientsRaw ?? "")
+    }
 
     var body: some View {
         NavigationStack {
@@ -234,23 +327,40 @@ struct AddRecipeSheet: View {
                 Section("Note") {
                     TextField("e.g. Reheats well, Freezes well", text: $note)
                 }
+                Section {
+                    TextField("2 lb chicken thighs\n1 can black beans\n1 bunch cilantro", text: $ingredients, axis: .vertical)
+                        .lineLimit(4...12)
+                } header: {
+                    Text("Ingredients")
+                } footer: {
+                    Text("One per line. Add them to your grocery list from the recipe card or the week plan.")
+                }
             }
-            .navigationTitle("New recipe")
+            .navigationTitle(recipe == nil ? "New recipe" : "Edit recipe")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        context.insert(Recipe(name: name.trimmingCharacters(in: .whitespaces),
-                                              servings: servings, slot: slot, note: note))
-                        dismiss()
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button("Save", action: save)
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
-        .presentationDetents([.medium])
+    }
+
+    private func save() {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        if let recipe {
+            recipe.name = trimmed
+            recipe.servings = servings
+            recipe.slotRaw = slot.rawValue
+            recipe.note = note
+            recipe.ingredientsRaw = ingredients
+        } else {
+            context.insert(Recipe(name: trimmed, servings: servings, slot: slot, note: note, ingredients: ingredients))
+        }
+        dismiss()
     }
 }

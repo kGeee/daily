@@ -14,17 +14,25 @@ struct TodayView: View {
     @State private var selectedDay = Calendar.current.startOfDay(for: .now)
     @State private var editingEvent: CustomEvent?
     @State private var showNewEvent = false
+    @State private var showWeekPlan = false
+    @Query private var plans: [MealPlan]
+    @AppStorage(Pref.revision) private var revision = 0
 
     private var planner: DayPlanner { DayPlanner(pattern: pattern, overrides: overrides) }
     private var dayKey: String { DayKey.of(selectedDay) }
 
     var body: some View {
+        let _ = revision
         TimelineView(.everyMinute) { tl in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header
                     WeekStrip(selected: $selectedDay, planner: planner)
                     statsRow
+                    if Calendar.current.isDateInToday(selectedDay),
+                       Calendar.current.component(.hour, from: tl.date) >= 17 {
+                        tomorrowCard(now: tl.date)
+                    }
                     timeline(now: tl.date)
                 }
                 .padding(.horizontal, 16)
@@ -47,6 +55,9 @@ struct TodayView: View {
                 .accessibilityLabel("Add event")
             }
         }
+        .sheet(isPresented: $showWeekPlan) {
+            WeekPlanView()
+        }
         .sheet(isPresented: $showNewEvent) {
             EventEditor(event: nil, defaultDay: selectedDay)
         }
@@ -66,6 +77,16 @@ struct TodayView: View {
                     .foregroundStyle(Palette.ink)
             }
             Spacer()
+            Button {
+                showWeekPlan = true
+            } label: {
+                Image(systemName: "calendar")
+                    .font(.headline)
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 36, height: 36)
+                    .background(Palette.card, in: Circle())
+            }
+            .accessibilityLabel("Plan the week")
             if let type = planner.type(for: selectedDay) {
                 Menu {
                     ForEach(DayType.allCases) { t in
@@ -175,7 +196,69 @@ struct TodayView: View {
         let names = food
             .filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) && $0.slot == slot }
             .map { $0.source == .out ? "\($0.name) (out)" : $0.name }
-        return names.isEmpty ? nil : names.joined(separator: ", ")
+        if !names.isEmpty { return names.joined(separator: ", ") }
+        return plannedTitle(for: slot, on: selectedDay).map { "Planned: " + $0 }
+    }
+
+    private func plannedTitle(for slot: MealSlot, on day: Date) -> String? {
+        let key = DayKey.of(day)
+        return plans.first { $0.dayKey == key && $0.slot == slot }?.title
+    }
+
+    // MARK: Tomorrow
+
+    private func tomorrowCard(now: Date) -> some View {
+        let cal = Calendar.current
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: now)) ?? now
+        let type = planner.type(for: tomorrow)
+        let firstOut = planner.blocks(for: tomorrow, lunchNote: nil, dinnerNote: nil).first { $0.isDeparture }
+        let lunch = plannedTitle(for: .lunch, on: tomorrow)
+        let nextWorkout = WorkoutTemplate.nextName(templates: templates, sessions: sessions)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                SectionLabel(text: "Tomorrow · " + (type?.title ?? tomorrow.formatted(.dateTime.weekday(.wide))))
+                Spacer()
+                Button("Plan week") { showWeekPlan = true }
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.commuteText)
+            }
+            if let firstOut {
+                checklistLine(symbol: firstOut.symbol, color: Palette.commute,
+                              text: firstOut.title + " " + (firstOut.isEstimate ? "~" : "")
+                                + firstOut.start.formatted(date: .omitted, time: .shortened)
+                                + " · leave by " + (firstOut.leaveBy ?? firstOut.start).formatted(date: .omitted, time: .shortened))
+                checklistLine(symbol: "alarm", color: Palette.sleep,
+                              text: "Up at " + MySchedule.wake.label + ", so bed by " + MySchedule.bedtime.label)
+            }
+            if type == .gym {
+                checklistLine(symbol: "bag", color: Palette.gym,
+                              text: "Pack your gym bag" + (nextWorkout.map { " · \($0) day" } ?? ""))
+            }
+            if type != nil {
+                checklistLine(symbol: "takeoutbag.and.cup.and.straw", color: Palette.food,
+                              text: lunch.map { "Lunch: " + $0 + (($0 == MealPlan.eatOut) ? "" : ". Pack it tonight") }
+                                ?? "No lunch planned yet")
+            }
+            let tomorrowEvents = events.filter { $0.occurs(on: tomorrow) }.map { $0.block(on: tomorrow) }.sorted { $0.start < $1.start }
+            ForEach(tomorrowEvents) { event in
+                checklistLine(symbol: event.symbol, color: event.category.color,
+                              text: event.start.formatted(date: .omitted, time: .shortened) + " · " + event.title)
+            }
+        }
+        .card()
+    }
+
+    private func checklistLine(symbol: String, color: Color, text: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 22)
+            Text(text)
+                .font(.footnote)
+                .foregroundStyle(Palette.ink)
+        }
     }
 
     private func isDone(_ block: TimelineBlock) -> Bool {
@@ -192,7 +275,7 @@ struct TodayView: View {
 
     private func badge(for block: TimelineBlock, now: Date, isToday: Bool) -> String? {
         guard isToday, block.isDeparture, !isDone(block) else { return nil }
-        let minutes = Int(block.start.timeIntervalSince(now) / 60)
+        let minutes = Int((block.leaveBy ?? block.start).timeIntervalSince(now) / 60)
         guard minutes >= 0, minutes <= 90 else { return nil }
         return minutes == 0 ? "Leaving now" : "Leave in \(minutes) min"
     }
