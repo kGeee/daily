@@ -1,0 +1,116 @@
+import Foundation
+import SwiftData
+
+enum MealSlot: String, CaseIterable, Identifiable {
+    case breakfast, lunch, dinner, snack
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+}
+
+enum MealSource: String, CaseIterable, Identifiable {
+    case prepped, cooked, out
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .prepped: return "Prepped"
+        case .cooked: return "Cooked"
+        case .out: return "Ate out"
+        }
+    }
+    var isHome: Bool { self != .out }
+}
+
+@Model
+final class FoodEntry {
+    var date: Date
+    var slotRaw: String
+    var name: String
+    var sourceRaw: String
+    var calories: Int?
+    var protein: Int?
+
+    init(date: Date = .now, slot: MealSlot, name: String, source: MealSource, calories: Int? = nil, protein: Int? = nil) {
+        self.date = date
+        self.slotRaw = slot.rawValue
+        self.name = name
+        self.sourceRaw = source.rawValue
+        self.calories = calories
+        self.protein = protein
+    }
+
+    var slot: MealSlot { MealSlot(rawValue: slotRaw) ?? .snack }
+    var source: MealSource { MealSource(rawValue: sourceRaw) ?? .cooked }
+}
+
+@Model
+final class GroceryItem {
+    var name: String
+    var quantity: String
+    var section: String
+    var trip: Int
+    var isDone: Bool
+    var createdAt: Date
+
+    init(name: String, quantity: String = "", section: String, trip: Int) {
+        self.name = name
+        self.quantity = quantity
+        self.section = section
+        self.trip = trip
+        self.isDone = false
+        self.createdAt = .now
+    }
+}
+
+@Model
+final class Recipe {
+    var name: String
+    var servings: Int
+    var slotRaw: String
+    var note: String
+    var createdAt: Date
+
+    init(name: String, servings: Int, slot: MealSlot, note: String = "") {
+        self.name = name
+        self.servings = servings
+        self.slotRaw = slot.rawValue
+        self.note = note
+        self.createdAt = .now
+    }
+
+    var slot: MealSlot { MealSlot(rawValue: slotRaw) ?? .dinner }
+}
+
+@Model
+final class WaterEntry {
+    var date: Date
+    var ounces: Int
+
+    init(date: Date = .now, ounces: Int) {
+        self.date = date
+        self.ounces = ounces
+    }
+}
+
+/// Marks a timeline block as done on a given day.
+@Model
+final class BlockCheck {
+    var dayKey: String
+    var blockID: String
+
+    init(dayKey: String, blockID: String) {
+        self.dayKey = dayKey
+        self.blockID = blockID
+    }
+}
+
+/// A one-off change to a day's type (e.g. making today a gym day).
+@Model
+final class DayTypeOverride {
+    @Attribute(.unique) var dayKey: String
+    var typeRaw: String
+
+    init(dayKey: String, typeRaw: String) {
+        self.dayKey = dayKey
+        self.typeRaw = typeRaw
+    }
+}
