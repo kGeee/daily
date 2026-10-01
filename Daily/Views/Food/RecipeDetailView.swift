@@ -198,6 +198,13 @@ struct ImportRecipeView: View {
     @State private var slot: MealSlot = .dinner
     @State private var photoItems: [PhotosPickerItem] = []
     @State private var readingPhotos = false
+    @State private var autoRun = false
+
+    init(link: String = "", text: String = "", autoRun: Bool = false) {
+        _link = State(initialValue: link)
+        _text = State(initialValue: text)
+        _autoRun = State(initialValue: autoRun)
+    }
 
     var body: some View {
         NavigationStack {
@@ -280,6 +287,12 @@ struct ImportRecipeView: View {
             }
             .onChange(of: photoItems) { _, items in
                 readScreenshots(items)
+            }
+            .task {
+                if autoRun {
+                    autoRun = false
+                    runImport()
+                }
             }
             .navigationTitle("Import recipe")
             .navigationBarTitleDisplayMode(.inline)

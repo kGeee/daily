@@ -14,7 +14,14 @@ Design mockups: the "Daily Life App Mockups" canvas (light + dark).
 On a real iPhone the first time: Settings → Privacy & Security → Developer Mode → On,
 and Settings → General → VPN & Device Management → trust your developer certificate.
 
-## What's in v0.1
+## First run with widgets and sharing
+
+The project has three targets: **Daily**, **DailyWidgets** and **DailyShare**. For each one, open
+Signing & Capabilities and pick your Team. They share data through the App Group `group.com.kgeee.daily`
+(already set in `Config/*.entitlements`). If Xcode says the App Group or bundle IDs aren't available,
+change `com.kgeee` to something unique in all three targets and in `SharedStore.groupID` + the entitlements.
+
+## What's in the app
 
 - **Today** — week strip, day type (Shuttle / Gym / Caltrain), timeline with check-offs and a "now" line,
   water (+8 oz; long-press for more), eat-outs this week.
@@ -45,9 +52,19 @@ All data stays on the phone (SwiftData). Light and dark mode follow the system s
 Change everything in the app under Commute → gear. Defaults live in `Pref` in `Daily/Schedule/Schedule.swift`.
 Caltrain uses the train times you add in Settings; until then it shows estimates (marked ~).
 
+- **Goals** — daily calories and protein (Settings), with progress on Today and Food.
+- **Week in review** — Food → Review (and a banner on Sundays): eat-outs vs goal, nutrition, gym, water,
+  departures, and a 6-week eating-out trend.
+- **Plan my prep with AI** — in Plan the week: picks recipes that reheat well and hit your goals, fills
+  empty meals, and builds the grocery list (optionally using what's already in your kitchen).
+- **Live Caltrain** — add a free 511.org key and your station in Settings for live departures and delays.
+- **Backup** — Settings → Backup to save everything to a file, and restore from one.
+- **Widgets** — Next up (home + lock screen) and Water with +8 / +16 buttons.
+- **Lock Screen countdown** — Commute → "Show countdown on Lock Screen" (Live Activity + Dynamic Island).
+- **Share from Instagram** — Share → Daily on a reel; the importer opens next time you open the app.
+
 ## Next up
 
 - Live Caltrain times (511.org API)
 - Apple Health for sleep and water
 - Recipe suggestions from what you have
-- Share sheet extension so reels can be sent straight from Instagram

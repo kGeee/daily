@@ -6,14 +6,73 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D41100000000000000000041 /* DailyWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D41100000000000000000020; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D41100000000000000000042 /* DailyShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D41100000000000000000021; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D41100000000000000000043 = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D4110000000000000000000A;
+			proxyType = 1;
+			remoteGlobalIDString = D41100000000000000000026;
+			remoteInfo = DailyWidgets;
+		};
+		D41100000000000000000044 = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D4110000000000000000000A;
+			proxyType = 1;
+			remoteGlobalIDString = D41100000000000000000030;
+			remoteInfo = DailyShare;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D41100000000000000000040 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				D41100000000000000000041,
+				D41100000000000000000042,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		D41100000000000000000001 /* Daily.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Daily.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D41100000000000000000020 /* DailyWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DailyWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D41100000000000000000021 /* DailyShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DailyShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D41100000000000000000002 /* Daily */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Daily;
+			sourceTree = "<group>";
+		};
+		D41100000000000000000022 /* SharedCore */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SharedCore;
+			sourceTree = "<group>";
+		};
+		D41100000000000000000023 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		D41100000000000000000024 /* DailyWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DailyWidgets;
+			sourceTree = "<group>";
+		};
+		D41100000000000000000025 /* DailyShare */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DailyShare;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -26,21 +85,41 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D41100000000000000000029 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D41100000000000000000033 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		D41100000000000000000004 = {
 			isa = PBXGroup;
 			children = (
-				D41100000000000000000002 /* Daily */,
-				D41100000000000000000005 /* Products */,
+				D41100000000000000000002,
+				D41100000000000000000022,
+				D41100000000000000000023,
+				D41100000000000000000024,
+				D41100000000000000000025,
+				D41100000000000000000005,
 			);
 			sourceTree = "<group>";
 		};
 		D41100000000000000000005 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				D41100000000000000000001 /* Daily.app */,
+				D41100000000000000000001,
+				D41100000000000000000020,
+				D41100000000000000000021,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -50,25 +129,77 @@
 /* Begin PBXNativeTarget section */
 		D41100000000000000000006 /* Daily */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = D41100000000000000000007 /* Build configuration list for PBXNativeTarget "Daily" */;
+			buildConfigurationList = D41100000000000000000007;
 			buildPhases = (
-				D41100000000000000000008 /* Sources */,
-				D41100000000000000000003 /* Frameworks */,
-				D41100000000000000000009 /* Resources */,
+				D41100000000000000000008,
+				D41100000000000000000003,
+				D41100000000000000000009,
+				D41100000000000000000040,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D41100000000000000000045,
+				D41100000000000000000046,
+			);
+			fileSystemSynchronizedGroups = (
+				D41100000000000000000002,
+				D41100000000000000000022,
+				D41100000000000000000023,
+			);
+			name = Daily;
+			packageProductDependencies = (
+			);
+			productName = Daily;
+			productReference = D41100000000000000000001;
+			productType = "com.apple.product-type.application";
+		};
+		D41100000000000000000026 /* DailyWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D41100000000000000000027;
+			buildPhases = (
+				D41100000000000000000028,
+				D41100000000000000000029,
+				D4110000000000000000002A,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				D41100000000000000000002 /* Daily */,
+				D41100000000000000000024,
+				D41100000000000000000022,
+				D41100000000000000000023,
 			);
-			name = Daily;
+			name = DailyWidgets;
 			packageProductDependencies = (
 			);
-			productName = Daily;
-			productReference = D41100000000000000000001 /* Daily.app */;
-			productType = "com.apple.product-type.application";
+			productName = DailyWidgets;
+			productReference = D41100000000000000000020;
+			productType = "com.apple.product-type.app-extension";
+		};
+		D41100000000000000000030 /* DailyShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D41100000000000000000031;
+			buildPhases = (
+				D41100000000000000000032,
+				D41100000000000000000033,
+				D41100000000000000000034,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				D41100000000000000000025,
+				D41100000000000000000022,
+			);
+			name = DailyShare;
+			packageProductDependencies = (
+			);
+			productName = DailyShare;
+			productReference = D41100000000000000000021;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -83,9 +214,15 @@
 					D41100000000000000000006 = {
 						CreatedOnToolsVersion = 16.0;
 					};
+					D41100000000000000000026 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					D41100000000000000000030 = {
+						CreatedOnToolsVersion = 16.0;
+					};
 				};
 			};
-			buildConfigurationList = D4110000000000000000000B /* Build configuration list for PBXProject "Daily" */;
+			buildConfigurationList = D4110000000000000000000B;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -95,17 +232,33 @@
 			mainGroup = D41100000000000000000004;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = D41100000000000000000005 /* Products */;
+			productRefGroup = D41100000000000000000005;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				D41100000000000000000006 /* Daily */,
+				D41100000000000000000006,
+				D41100000000000000000026,
+				D41100000000000000000030,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		D41100000000000000000009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D4110000000000000000002A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D41100000000000000000034 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +275,34 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D41100000000000000000028 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D41100000000000000000032 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D41100000000000000000045 = {
+			isa = PBXTargetDependency;
+			target = D41100000000000000000026;
+			targetProxy = D41100000000000000000043;
+		};
+		D41100000000000000000046 = {
+			isa = PBXTargetDependency;
+			target = D41100000000000000000030;
+			targetProxy = D41100000000000000000044;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		D4110000000000000000000C /* Debug */ = {
@@ -177,11 +357,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/Daily.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -204,11 +386,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Config/Daily.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -226,23 +410,145 @@
 			};
 			name = Release;
 		};
+		D4110000000000000000002B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/Widgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Widgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Daily;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kgeee.daily.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		D4110000000000000000002C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/Widgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Widgets-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Daily;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kgeee.daily.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		D41100000000000000000035 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/Share.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Share-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Daily;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kgeee.daily.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		D41100000000000000000036 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Config/Share.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Share-Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Daily;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kgeee.daily.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		D41100000000000000000007 /* Build configuration list for PBXNativeTarget "Daily" */ = {
+		D41100000000000000000007 = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D4110000000000000000000E /* Debug */,
-				D4110000000000000000000F /* Release */,
+				D4110000000000000000000E,
+				D4110000000000000000000F,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		D4110000000000000000000B /* Build configuration list for PBXProject "Daily" */ = {
+		D4110000000000000000000B = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				D4110000000000000000000C /* Debug */,
-				D4110000000000000000000D /* Release */,
+				D4110000000000000000000C,
+				D4110000000000000000000D,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D41100000000000000000027 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D4110000000000000000002B,
+				D4110000000000000000002C,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D41100000000000000000031 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D41100000000000000000035,
+				D41100000000000000000036,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

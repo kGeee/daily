@@ -124,6 +124,22 @@ struct CommuteView: View {
                         .font(.caption)
                         .opacity(0.85)
                 }
+                if minutes > -5 && minutes < 180 && WidgetSync.canShowLiveActivities {
+                    Button {
+                        Task {
+                            await WidgetSync.startCountdown(title: block.title, subtitle: block.subtitle,
+                                                            departure: block.start, leaveBy: leaveAt, symbol: block.symbol)
+                        }
+                    } label: {
+                        Label("Show countdown on Lock Screen", systemImage: "lock.iphone")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(Palette.commute)
+                            .padding(.horizontal, 12)
+                            .frame(height: 34)
+                            .background(Palette.onAccent, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
             } else {
                 Text("Nothing scheduled this week.")
                     .font(.headline)

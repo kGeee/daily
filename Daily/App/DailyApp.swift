@@ -25,8 +25,13 @@ struct DailyApp: App {
 
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var context
     @Query private var overrides: [DayTypeOverride]
     @Query private var events: [CustomEvent]
+    @Query private var food: [FoodEntry]
+    @Query private var water: [WaterEntry]
+    @Query private var plans: [MealPlan]
+    @State private var pendingImport: SharedStore.PendingImport?
     @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
     @AppStorage("remindersOn") private var remindersOn = false
     @AppStorage(Pref.revision) private var revision = 0
@@ -37,6 +42,14 @@ struct RootView: View {
         let e = events.map { "\($0.id)\($0.start.timeIntervalSince1970)\($0.repeatRaw)\($0.remind)\($0.title)" }
             .sorted().joined(separator: ",")
         return "\(remindersOn)|\(revision)|\(pattern)|\(o)|\(e)"
+    }
+
+    /// Changes whenever anything the widgets show changes.
+    private var widgetKey: String {
+        let w = water.reduce(0) { $0 + $1.ounces }
+        let f = food.count
+        let c = food.compactMap { $0.calories }.reduce(0, +)
+        return "\(reminderKey)|\(w)|\(f)|\(c)|\(plans.count)"
     }
 
     var body: some View {
@@ -51,15 +64,41 @@ struct RootView: View {
                 .tabItem { Label("Food", systemImage: "fork.knife") }
         }
         .tint(Palette.commute)
-        .task { await refreshReminders() }
+        .task {
+            appBecameActive()
+            await refreshReminders()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
+                appBecameActive()
                 Task { await refreshReminders() }
+            } else if phase == .background {
+                refreshWidgets()
             }
         }
         .onChange(of: reminderKey) { _, _ in
             Task { await refreshReminders() }
         }
+        .onChange(of: widgetKey) { _, _ in
+            refreshWidgets()
+        }
+        .sheet(item: $pendingImport) { item in
+            ImportRecipeView(link: item.link, text: item.text, autoRun: true)
+        }
+    }
+
+    private func appBecameActive() {
+        WidgetSync.mergePendingWater(into: context)
+        if pendingImport == nil, let next = SharedStore.takePendingImports().last {
+            pendingImport = next
+        }
+        refreshWidgets()
+        Task { await WidgetSync.endFinishedCountdowns() }
+    }
+
+    private func refreshWidgets() {
+        WidgetSync.update(planner: DayPlanner(pattern: pattern, overrides: overrides),
+                          food: food, water: water, plans: plans)
     }
 
     private func refreshReminders() async {
