@@ -116,6 +116,7 @@ struct SettingsView: View {
     @AppStorage(Pref.eatOutGoal) private var eatOutGoal = Pref.eatOutGoalDefault
 
     @AppStorage(Pref.revision) private var revision = 0
+    @State private var apiKey = Keychain.read() ?? ""
 
     var body: some View {
         NavigationStack {
@@ -159,6 +160,22 @@ struct SettingsView: View {
                     footer: "Used for gym days and Caltrain days. Swipe left to remove one.",
                     raw: $eveningTrains,
                     suggested: ClockTime(17, 0))
+
+                Section {
+                    SecureField("Anthropic API key", text: $apiKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: apiKey) { _, newValue in
+                            Keychain.save(newValue)
+                        }
+                    if let url = URL(string: "https://console.anthropic.com/settings/keys") {
+                        Link("Get a key", destination: url)
+                    }
+                } header: {
+                    Text("AI (optional)")
+                } footer: {
+                    Text("Used to import recipes from Instagram, estimate calories and macros, and read recipe text. Stored in your iPhone's Keychain and sent only to Anthropic. Usage is billed to your Anthropic account.")
+                }
 
                 Section("Your day") {
                     TimeField(title: "Wake up", minutes: $wake)

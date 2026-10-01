@@ -28,14 +28,19 @@ final class FoodEntry {
     var sourceRaw: String
     var calories: Int?
     var protein: Int?
+    var carbs: Int? = nil
+    var fat: Int? = nil
 
-    init(date: Date = .now, slot: MealSlot, name: String, source: MealSource, calories: Int? = nil, protein: Int? = nil) {
+    init(date: Date = .now, slot: MealSlot, name: String, source: MealSource,
+         calories: Int? = nil, protein: Int? = nil, carbs: Int? = nil, fat: Int? = nil) {
         self.date = date
         self.slotRaw = slot.rawValue
         self.name = name
         self.sourceRaw = source.rawValue
         self.calories = calories
         self.protein = protein
+        self.carbs = carbs
+        self.fat = fat
     }
 
     var slot: MealSlot { MealSlot(rawValue: slotRaw) ?? .snack }
@@ -70,6 +75,14 @@ final class Recipe {
     var createdAt: Date
     /// One ingredient per line, e.g. "2 lb chicken thighs".
     var ingredientsRaw: String = ""
+    /// One step per line.
+    var stepsRaw: String = ""
+    var caloriesPerServing: Int? = nil
+    var proteinPerServing: Int? = nil
+    var carbsPerServing: Int? = nil
+    var fatPerServing: Int? = nil
+    /// Where it came from, e.g. an Instagram reel link.
+    var sourceURL: String = ""
 
     init(name: String, servings: Int, slot: MealSlot, note: String = "", ingredients: String = "") {
         self.name = name
@@ -86,6 +99,24 @@ final class Recipe {
         ingredientsRaw.split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+    }
+
+    var steps: [String] {
+        stepsRaw.split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    var hasNutrition: Bool { caloriesPerServing != nil }
+
+    /// "520 cal · 42P 48C 16F", or nil if unknown.
+    var macroLine: String? {
+        guard let cal = caloriesPerServing else { return nil }
+        var parts = ["\(cal) cal"]
+        let macros = [("P", proteinPerServing), ("C", carbsPerServing), ("F", fatPerServing)]
+            .compactMap { pair in pair.1.map { "\($0)\(pair.0)" } }
+        if !macros.isEmpty { parts.append(macros.joined(separator: " ")) }
+        return parts.joined(separator: " · ")
     }
 }
 

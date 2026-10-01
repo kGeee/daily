@@ -32,6 +32,11 @@ and Settings → General → VPN & Device Management → trust your developer ce
   recipes' ingredients to the grocery list.
 - **Tomorrow** card on Today after 5 PM — first departure and leave-by time, gym bag, lunch, events.
 - Timeline shows free gaps of 90+ minutes, leave-by times, and planned meals.
+- **Recipes** — tap one for ingredients, steps and per-serving nutrition. **Start cooking** opens a
+  step-by-step mode (screen stays on, read-aloud, one-tap timers for times in each step).
+- **Calories & macros** — per recipe and per meal; logging a recipe fills them in. With an Anthropic API
+  key (Settings → AI) the app can estimate them, and **Import** reads a recipe from an Instagram reel link
+  or pasted caption.
 
 All data stays on the phone (SwiftData). Light and dark mode follow the system setting.
 
@@ -45,3 +50,4 @@ Caltrain uses the train times you add in Settings; until then it shows estimates
 - Live Caltrain times (511.org API)
 - Apple Health for sleep and water
 - Recipe suggestions from what you have
+- Share sheet extension so reels can be sent straight from Instagram

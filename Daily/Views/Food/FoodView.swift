@@ -80,6 +80,8 @@ struct FoodTodaySection: View {
         let total = max(home + out, 1)
         let calories = todays.compactMap { $0.calories }.reduce(0, +)
         let protein = todays.compactMap { $0.protein }.reduce(0, +)
+        let carbs = todays.compactMap { $0.carbs }.reduce(0, +)
+        let fat = todays.compactMap { $0.fat }.reduce(0, +)
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -109,18 +111,23 @@ struct FoodTodaySection: View {
             }
             .frame(height: 10)
 
+            SectionLabel(text: "Today")
+                .padding(.top, 4)
             HStack(spacing: 8) {
-                miniStat(label: "Calories today", value: calories > 0 ? calories.formatted() : "—")
-                miniStat(label: "Protein today", value: protein > 0 ? "\(protein) g" : "—")
+                miniStat(label: "Calories", value: calories > 0 ? calories.formatted() : "—")
+                miniStat(label: "Protein", value: protein > 0 ? "\(protein)g" : "—")
+                miniStat(label: "Carbs", value: carbs > 0 ? "\(carbs)g" : "—")
+                miniStat(label: "Fat", value: fat > 0 ? "\(fat)g" : "—")
             }
-            .padding(.top, 4)
         }
         .card()
     }
 
     private func miniStat(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            SectionLabel(text: label)
+            Text(label)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Palette.muted)
             Text(value).font(.subheadline.weight(.heavy)).foregroundStyle(Palette.ink)
         }
         .padding(.horizontal, 10)
@@ -146,8 +153,16 @@ struct FoodTodaySection: View {
                                         .foregroundStyle(Palette.muted)
                                     Spacer(minLength: 4)
                                     Button(planned.isEatingOut ? "Ate out" : "Ate it") {
-                                        context.insert(FoodEntry(slot: slot, name: planned.title,
-                                                                 source: planned.isEatingOut ? .out : .prepped))
+                                        if planned.isEatingOut {
+                                            draft = LogDraft(slot: slot, source: .out)
+                                        } else {
+                                            let recipe = recipes.first { $0.name == planned.title }
+                                            context.insert(FoodEntry(slot: slot, name: planned.title, source: .prepped,
+                                                                     calories: recipe?.caloriesPerServing,
+                                                                     protein: recipe?.proteinPerServing,
+                                                                     carbs: recipe?.carbsPerServing,
+                                                                     fat: recipe?.fatPerServing))
+                                        }
                                     }
                                     .font(.caption.weight(.heavy))
                                     .foregroundStyle(Palette.onAccent)
@@ -164,9 +179,16 @@ struct FoodTodaySection: View {
                         }
                         ForEach(items) { entry in
                             HStack(spacing: 8) {
-                                Text(entry.name)
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(Palette.ink)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(entry.name)
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(Palette.ink)
+                                    if let cal = entry.calories {
+                                        Text("\(cal) cal" + (entry.protein.map { " · \($0)g protein" } ?? ""))
+                                            .font(.caption)
+                                            .foregroundStyle(Palette.muted)
+                                    }
+                                }
                                 Spacer(minLength: 4)
                                 sourceTag(entry.source)
                             }
@@ -238,11 +260,53 @@ struct LogMealSheet: View {
     @State private var source: MealSource
     @State private var calories = ""
     @State private var protein = ""
+    @State private var carbs = ""
+    @State private var fat = ""
+    @State private var estimating = false
+    @State private var estimateNote: String?
 
     init(draft: LogDraft) {
         _name = State(initialValue: draft.name)
         _slot = State(initialValue: draft.slot)
         _source = State(initialValue: draft.source)
+    }
+
+    private func use(_ recipe: Recipe) {
+        name = recipe.name
+        calories = recipe.caloriesPerServing.map(String.init) ?? ""
+        protein = recipe.proteinPerServing.map(String.init) ?? ""
+        carbs = recipe.carbsPerServing.map(String.init) ?? ""
+        fat = recipe.fatPerServing.map(String.init) ?? ""
+    }
+
+    private func estimate() {
+        estimating = true
+        estimateNote = nil
+        let description = name.trimmingCharacters(in: .whitespaces)
+        Task {
+            do {
+                let result = try await RecipeAI.estimate(meal: description)
+                calories = String(Int(result.calories.rounded()))
+                protein = String(Int(result.protein.rounded()))
+                carbs = String(Int(result.carbs.rounded()))
+                fat = String(Int(result.fat.rounded()))
+                estimateNote = result.note
+            } catch {
+                estimateNote = error.localizedDescription
+            }
+            estimating = false
+        }
+    }
+
+    private func numberRow(_ title: String, text: Binding<String>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField("—", text: text)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 90)
+        }
     }
 
     var body: some View {
@@ -258,16 +322,45 @@ struct LogMealSheet: View {
                     }
                     .pickerStyle(.segmented)
                 }
-                if source == .prepped && !recipes.isEmpty {
-                    Section("From your prep") {
+                if source != .out && !recipes.isEmpty {
+                    Section("From your recipes") {
                         ForEach(recipes) { recipe in
-                            Button(recipe.name) { name = recipe.name }
+                            Button {
+                                use(recipe)
+                            } label: {
+                                HStack {
+                                    Text(recipe.name).foregroundStyle(Palette.ink)
+                                    Spacer()
+                                    if let line = recipe.macroLine {
+                                        Text(line).font(.caption).foregroundStyle(Palette.muted)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                Section("Optional") {
-                    TextField("Calories", text: $calories).keyboardType(.numberPad)
-                    TextField("Protein (g)", text: $protein).keyboardType(.numberPad)
+                Section {
+                    numberRow("Calories", text: $calories)
+                    numberRow("Protein (g)", text: $protein)
+                    numberRow("Carbs (g)", text: $carbs)
+                    numberRow("Fat (g)", text: $fat)
+                    Button {
+                        estimate()
+                    } label: {
+                        HStack {
+                            Text(estimating ? "Estimating…" : "Estimate from the description")
+                            Spacer()
+                            if estimating { ProgressView() }
+                        }
+                    }
+                    .disabled(estimating || name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if let estimateNote {
+                        Text(estimateNote).font(.footnote).foregroundStyle(Palette.muted)
+                    }
+                } header: {
+                    Text("Nutrition (optional)")
+                } footer: {
+                    Text("Be specific for better estimates, e.g. \"Chipotle chicken bowl, white rice, black beans, guac\".")
                 }
             }
             .navigationTitle("Log meal")
@@ -283,6 +376,11 @@ struct LogMealSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .onAppear {
+            if calories.isEmpty, let match = recipes.first(where: { $0.name == name }) {
+                use(match)
+            }
+        }
     }
 
     private func save() {
@@ -290,7 +388,9 @@ struct LogMealSheet: View {
                                  name: name.trimmingCharacters(in: .whitespaces),
                                  source: source,
                                  calories: Int(calories),
-                                 protein: Int(protein)))
+                                 protein: Int(protein),
+                                 carbs: Int(carbs),
+                                 fat: Int(fat)))
         dismiss()
     }
 }

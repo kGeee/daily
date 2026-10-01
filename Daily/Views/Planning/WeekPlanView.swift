@@ -261,6 +261,15 @@ struct WeekPlanView: View {
                 mealMenu(day: day, slot: .lunch)
                 mealMenu(day: day, slot: .dinner)
             }
+            let plannedCalories = [MealSlot.lunch, .dinner]
+                .compactMap { plan(for: day, slot: $0) }
+                .compactMap { p in recipes.first { $0.name == p.title }?.caloriesPerServing }
+                .reduce(0, +)
+            if plannedCalories > 0 {
+                Text("~\(plannedCalories) cal planned for lunch + dinner")
+                    .font(.caption)
+                    .foregroundStyle(Palette.muted)
+            }
 
             if !dayEvents.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {

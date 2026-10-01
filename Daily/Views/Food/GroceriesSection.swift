@@ -14,6 +14,8 @@ struct GroceriesSection: View {
     @State private var newSection = "Produce"
     @State private var showAddRecipe = false
     @State private var editingRecipe: Recipe?
+    @State private var viewingRecipe: Recipe?
+    @State private var showImport = false
     @State private var showWeekPlan = false
 
     private var tripItems: [GroceryItem] { items.filter { $0.trip == trip } }
@@ -51,6 +53,12 @@ struct GroceriesSection: View {
         .sheet(item: $editingRecipe) { recipe in
             AddRecipeSheet(recipe: recipe)
         }
+        .sheet(item: $viewingRecipe) { recipe in
+            RecipeDetailView(recipe: recipe)
+        }
+        .sheet(isPresented: $showImport) {
+            ImportRecipeView()
+        }
         .sheet(isPresented: $showWeekPlan) {
             WeekPlanView()
         }
@@ -78,7 +86,7 @@ struct GroceriesSection: View {
                                     .foregroundStyle(Palette.foodText)
                                     .padding(.top, 4)
                             }
-                            Text(recipe.ingredients.isEmpty ? "No ingredients yet" : "\(recipe.ingredients.count) ingredients")
+                            Text(recipe.macroLine ?? (recipe.ingredients.isEmpty ? "No ingredients yet" : "\(recipe.ingredients.count) ingredients"))
                                 .font(.caption2)
                                 .foregroundStyle(Palette.faint)
                         }
@@ -86,8 +94,9 @@ struct GroceriesSection: View {
                         .padding(12)
                         .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                         .contentShape(Rectangle())
-                        .onTapGesture { editingRecipe = recipe }
+                        .onTapGesture { viewingRecipe = recipe }
                         .contextMenu {
+                            Button("Open") { viewingRecipe = recipe }
                             Button("Edit") { editingRecipe = recipe }
                             Button("Add ingredients to this trip") { addIngredients(of: recipe) }
                             Button("Delete", role: .destructive) { context.delete(recipe) }
@@ -101,6 +110,25 @@ struct GroceriesSection: View {
                                 .font(.subheadline.weight(.heavy))
                                 .foregroundStyle(Palette.ink)
                             Text("Pick ones that reheat well")
+                                .font(.caption)
+                                .foregroundStyle(Palette.muted)
+                        }
+                        .frame(width: 120, alignment: .leading)
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(Palette.faint, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    Button {
+                        showImport = true
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label("Import", systemImage: "square.and.arrow.down")
+                                .font(.subheadline.weight(.heavy))
+                                .foregroundStyle(Palette.ink)
+                            Text("From an Instagram reel or any recipe text")
                                 .font(.caption)
                                 .foregroundStyle(Palette.muted)
                         }
@@ -304,6 +332,13 @@ struct AddRecipeSheet: View {
     @State private var slot: MealSlot
     @State private var note: String
     @State private var ingredients: String
+    @State private var steps: String
+    @State private var calories: String
+    @State private var protein: String
+    @State private var carbs: String
+    @State private var fat: String
+    @State private var estimating = false
+    @State private var errorText: String?
 
     init(recipe: Recipe?) {
         self.recipe = recipe
@@ -312,6 +347,32 @@ struct AddRecipeSheet: View {
         _slot = State(initialValue: recipe?.slot ?? .dinner)
         _note = State(initialValue: recipe?.note ?? "Reheats well")
         _ingredients = State(initialValue: recipe?.ingredientsRaw ?? "")
+        _steps = State(initialValue: recipe?.stepsRaw ?? "")
+        _calories = State(initialValue: recipe?.caloriesPerServing.map(String.init) ?? "")
+        _protein = State(initialValue: recipe?.proteinPerServing.map(String.init) ?? "")
+        _carbs = State(initialValue: recipe?.carbsPerServing.map(String.init) ?? "")
+        _fat = State(initialValue: recipe?.fatPerServing.map(String.init) ?? "")
+    }
+
+    private var ingredientLines: [String] {
+        ingredients.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    private func estimate() {
+        estimating = true
+        errorText = nil
+        Task {
+            do {
+                let result = try await RecipeAI.estimate(recipe: name, servings: servings, ingredients: ingredientLines)
+                calories = String(Int(result.calories.rounded()))
+                protein = String(Int(result.protein.rounded()))
+                carbs = String(Int(result.carbs.rounded()))
+                fat = String(Int(result.fat.rounded()))
+            } catch {
+                errorText = error.localizedDescription
+            }
+            estimating = false
+        }
     }
 
     var body: some View {
@@ -334,6 +395,35 @@ struct AddRecipeSheet: View {
                     Text("Ingredients")
                 } footer: {
                     Text("One per line. Add them to your grocery list from the recipe card or the week plan.")
+                }
+                Section {
+                    TextField("Season and sear the chicken, 5 min per side\nSimmer the beans for 10 minutes", text: $steps, axis: .vertical)
+                        .lineLimit(4...16)
+                } header: {
+                    Text("Steps")
+                } footer: {
+                    Text("One step per line. Times like \"10 minutes\" get a timer button in cooking mode.")
+                }
+                Section {
+                    macroField("Calories", text: $calories)
+                    macroField("Protein (g)", text: $protein)
+                    macroField("Carbs (g)", text: $carbs)
+                    macroField("Fat (g)", text: $fat)
+                    Button {
+                        estimate()
+                    } label: {
+                        HStack {
+                            Text(estimating ? "Estimating…" : "Estimate with AI")
+                            Spacer()
+                            if estimating { ProgressView() }
+                        }
+                    }
+                    .disabled(estimating || ingredientLines.isEmpty || name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if let errorText {
+                        Text(errorText).font(.footnote).foregroundStyle(Palette.gymText)
+                    }
+                } header: {
+                    Text("Nutrition per serving")
                 }
             }
             .navigationTitle(recipe == nil ? "New recipe" : "Edit recipe")
@@ -358,9 +448,31 @@ struct AddRecipeSheet: View {
             recipe.slotRaw = slot.rawValue
             recipe.note = note
             recipe.ingredientsRaw = ingredients
+            apply(to: recipe)
         } else {
-            context.insert(Recipe(name: trimmed, servings: servings, slot: slot, note: note, ingredients: ingredients))
+            let newRecipe = Recipe(name: trimmed, servings: servings, slot: slot, note: note, ingredients: ingredients)
+            apply(to: newRecipe)
+            context.insert(newRecipe)
         }
         dismiss()
+    }
+
+    private func apply(to recipe: Recipe) {
+        recipe.stepsRaw = steps
+        recipe.caloriesPerServing = Int(calories.trimmingCharacters(in: .whitespaces))
+        recipe.proteinPerServing = Int(protein.trimmingCharacters(in: .whitespaces))
+        recipe.carbsPerServing = Int(carbs.trimmingCharacters(in: .whitespaces))
+        recipe.fatPerServing = Int(fat.trimmingCharacters(in: .whitespaces))
+    }
+
+    private func macroField(_ title: String, text: Binding<String>) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField("—", text: text)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 90)
+        }
     }
 }
