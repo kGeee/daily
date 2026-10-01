@@ -65,6 +65,22 @@ struct NextUpView: View {
     let entry: NextUpEntry
 
     var body: some View {
+        accessoryOrMain
+    }
+
+    @ViewBuilder
+    private var accessoryOrMain: some View {
+        switch family {
+        case .accessoryInline, .accessoryRectangular:
+            accessory
+                .containerBackground(.clear, for: .widget)
+        default:
+            mainView
+        }
+    }
+
+    @ViewBuilder
+    private var accessory: some View {
         switch family {
         case .accessoryInline:
             if let next = entry.next {
@@ -84,7 +100,7 @@ struct NextUpView: View {
                 Text("Nothing scheduled")
             }
         default:
-            mainView
+            EmptyView()
         }
     }
 
@@ -177,6 +193,7 @@ struct WaterWidgetView: View {
                 Text("\(entry.ounces)")
             }
             .gaugeStyle(.accessoryCircular)
+            .containerBackground(.clear, for: .widget)
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 Text("WATER")
