@@ -21,6 +21,12 @@ Signing & Capabilities and pick your Team. They share data through the App Group
 (already set in `Config/*.entitlements`). If Xcode says the App Group or bundle IDs aren't available,
 change `com.kgeee` to something unique in all three targets and in `SharedStore.groupID` + the entitlements.
 
+## Tests
+
+Press **⌘U** in Xcode (with an iPhone simulator selected) to run the unit tests in `DailyTests/`:
+schedule and day-type logic, Caltrain train picking, leave-by times, events, gym rotation,
+grocery parsing, cooking-timer detection, Instagram link handling, and a full backup → restore round trip.
+
 ## What's in the app
 
 - **Today** — week strip, day type (Shuttle / Gym / Caltrain), timeline with check-offs and a "now" line,

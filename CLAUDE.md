@@ -8,3 +8,4 @@
 - Targets: `Daily` (app, folders `Daily/`, `SharedCore/`, `Shared/`), `DailyWidgets` (widgets + Live Activity, folders `DailyWidgets/`, `SharedCore/`, `Shared/`), `DailyShare` (share extension, folders `DailyShare/`, `SharedCore/`). `SharedCore` must stay free of WidgetKit/ActivityKit. Extension Info.plists and entitlements live in `Config/` (not a synced folder).
 - App, widgets and share extension talk through the App Group `group.com.kgeee.daily` (`SharedStore`). The app pushes a snapshot for widgets via `WidgetSync`.
 - AI calls go through `AIClient` (Anthropic API, user's key in Keychain). Live trains use 511.org (`Caltrain511`).
+- Unit tests live in `DailyTests/` (target `DailyTests`, host app `Daily`, shared scheme `Daily`). Add a test with any logic change; keep logic out of views where possible so it can be tested.
