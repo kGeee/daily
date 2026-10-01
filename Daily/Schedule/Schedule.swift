@@ -38,6 +38,8 @@ enum MySchedule {
 
     static let shuttleStop = "Your shuttle stop"
     static let eatOutGoalPerWeek = 2
+    static let waterGoalOz = 100
+    static let reminderLeadMinutes = 10
 
     /// Usual day type for Mon–Fri, in order.
     static let defaultPattern = "shuttle,gym,gym,shuttle,caltrain"
@@ -81,10 +83,11 @@ enum DayType: String, CaseIterable, Identifiable {
 }
 
 enum BlockCategory {
-    case sleep, commute, work, food, gym
+    case sleep, commute, work, food, gym, general
 
     var color: Color {
         switch self {
+        case .general: return Palette.general
         case .sleep: return Palette.sleep
         case .commute: return Palette.commute
         case .work: return Palette.work
@@ -104,6 +107,7 @@ struct TimelineBlock: Identifiable {
     let symbol: String
     var isEstimate: Bool = false
     var isDeparture: Bool = false
+    var eventID: UUID? = nil
 }
 
 enum DayKey {
@@ -148,7 +152,8 @@ struct DayPlanner {
         return parts.joined(separator: ",")
     }
 
-    func blocks(for day: Date, lunchNote: String?, dinnerNote: String?) -> [TimelineBlock] {
+    func blocks(for day: Date, lunchNote: String?, dinnerNote: String?,
+                gymNote: String? = nil, events: [CustomEvent] = []) -> [TimelineBlock] {
         let d = Calendar.current.startOfDay(for: day)
         let weekday = Calendar.current.component(.weekday, from: d)
 
@@ -181,7 +186,7 @@ struct DayPlanner {
                 TimelineBlock(id: "go", start: MySchedule.leaveForGym.on(d), title: "Leave for gym",
                               subtitle: "Skip the 4:00 shuttle today", category: .gym, symbol: "arrow.right", isDeparture: true),
                 TimelineBlock(id: "gym", start: MySchedule.gymStart.on(d), end: MySchedule.gymEnd.on(d),
-                              title: "Gym", category: .gym, symbol: "dumbbell.fill"),
+                              title: "Gym", subtitle: gymNote ?? "", category: .gym, symbol: "dumbbell.fill"),
                 TimelineBlock(id: "home", start: MySchedule.caltrainAfterGym.on(d), title: "Caltrain home",
                               subtitle: "From Sunnyvale · next train after gym", category: .commute,
                               symbol: "tram.fill", isEstimate: true, isDeparture: true)
@@ -209,6 +214,7 @@ struct DayPlanner {
         out.append(dinner)
         out.append(TimelineBlock(id: "wind", start: MySchedule.windDown.on(d), title: "Wind down",
                                  subtitle: "Phone down · bed by 11:30", category: .sleep, symbol: "moon.fill"))
+        out += events.filter { $0.occurs(on: d) }.map { $0.block(on: d) }
         return out.sorted { $0.start < $1.start }
     }
 }

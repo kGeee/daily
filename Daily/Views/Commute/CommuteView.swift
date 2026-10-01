@@ -5,6 +5,7 @@ struct CommuteView: View {
     @Environment(\.modelContext) private var context
     @Query private var overrides: [DayTypeOverride]
     @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
+    @AppStorage("remindersOn") private var remindersOn = false
 
     private var planner: DayPlanner { DayPlanner(pattern: pattern, overrides: overrides) }
 
@@ -42,6 +43,7 @@ struct CommuteView: View {
                             .foregroundStyle(Palette.muted)
                             .card()
                     }
+                    remindersCard
                     weekCard
                 }
                 .padding(16)
@@ -145,6 +147,32 @@ struct CommuteView: View {
                         .stroke(leg.isToday ? Palette.commute : Color.clear, lineWidth: 2)
                 )
             }
+        }
+        .card()
+    }
+
+    // MARK: Reminders
+
+    private var remindersCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(
+                get: { remindersOn },
+                set: { newValue in
+                    if newValue {
+                        Task { remindersOn = await Reminders.requestPermission() }
+                    } else {
+                        remindersOn = false
+                    }
+                }
+            )) {
+                Text("Remind me \(MySchedule.reminderLeadMinutes) min before I leave")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Palette.ink)
+            }
+            .tint(Palette.commute)
+            Text("Also reminds you about Sunday meal prep, wind-down, and your own events.")
+                .font(.caption)
+                .foregroundStyle(Palette.muted)
         }
         .card()
     }

@@ -7,8 +7,13 @@ struct TodayView: View {
     @Query private var checks: [BlockCheck]
     @Query private var water: [WaterEntry]
     @Query private var food: [FoodEntry]
+    @Query private var events: [CustomEvent]
+    @Query(sort: \WorkoutTemplate.order) private var templates: [WorkoutTemplate]
+    @Query(sort: \WorkoutSession.date, order: .reverse) private var sessions: [WorkoutSession]
     @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
     @State private var selectedDay = Calendar.current.startOfDay(for: .now)
+    @State private var editingEvent: CustomEvent?
+    @State private var showNewEvent = false
 
     private var planner: DayPlanner { DayPlanner(pattern: pattern, overrides: overrides) }
     private var dayKey: String { DayKey.of(selectedDay) }
@@ -23,9 +28,30 @@ struct TodayView: View {
                     timeline(now: tl.date)
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 24)
+                .padding(.bottom, 90)
             }
             .background(Palette.bg.ignoresSafeArea())
+            .overlay(alignment: .bottomTrailing) {
+                Button {
+                    showNewEvent = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(Palette.onAccent)
+                        .frame(width: 60, height: 60)
+                        .background(Palette.commute, in: Circle())
+                        .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
+                }
+                .buttonStyle(.plain)
+                .padding(20)
+                .accessibilityLabel("Add event")
+            }
+        }
+        .sheet(isPresented: $showNewEvent) {
+            EventEditor(event: nil, defaultDay: selectedDay)
+        }
+        .sheet(item: $editingEvent) { event in
+            EventEditor(event: event, defaultDay: selectedDay)
         }
     }
 
@@ -90,7 +116,7 @@ struct TodayView: View {
             HStack(spacing: 8) {
                 Text("Water").font(.caption.weight(.bold)).foregroundStyle(Palette.waterText)
                 (Text("\(waterToday)").foregroundStyle(Palette.ink)
-                 + Text(" oz").foregroundStyle(Palette.muted))
+                 + Text("/\(MySchedule.waterGoalOz) oz").foregroundStyle(Palette.muted))
                     .font(.footnote.weight(.bold))
                 Spacer(minLength: 0)
                 Button {
@@ -171,29 +197,107 @@ struct TodayView: View {
         return minutes == 0 ? "Leaving now" : "Leave in \(minutes) min"
     }
 
-    private func timeline(now: Date) -> some View {
-        let blocks = planner.blocks(for: selectedDay, lunchNote: note(for: .lunch), dinnerNote: note(for: .dinner))
-        let isToday = Calendar.current.isDateInToday(selectedDay)
-        let nowIndex: Int? = isToday ? (blocks.firstIndex { $0.start > now } ?? blocks.count) : nil
+    /// What to show on the gym block: today's workout if started, else the next one in rotation.
+    private var gymNote: String? {
+        if let today = sessions.first(where: { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) }) {
+            return today.finishedAt == nil ? "\(today.templateName) day · in progress" : "\(today.templateName) day · done"
+        }
+        return WorkoutTemplate.nextName(templates: templates, sessions: sessions).map { "\($0) day" }
+    }
 
-        return VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
-                if index == nowIndex {
-                    NowLine(time: now)
-                }
-                TimelineRow(block: block,
-                            done: isDone(block),
-                            badge: badge(for: block, now: now, isToday: isToday)) {
-                    toggle(block)
+    private func items(now: Date) -> [TimelineItem] {
+        let blocks = planner.blocks(for: selectedDay, lunchNote: note(for: .lunch), dinnerNote: note(for: .dinner),
+                                    gymNote: gymNote, events: events)
+        var result: [TimelineItem] = []
+        var latestEnd: Date?
+        var nowPlaced = !Calendar.current.isDateInToday(selectedDay)
+
+        for block in blocks {
+            if let latestEnd {
+                let gap = block.start.timeIntervalSince(latestEnd)
+                if gap >= 90 * 60 {
+                    result.append(.free(id: "free-" + block.id, minutes: Int(gap / 60)))
                 }
             }
-            if nowIndex == blocks.count {
-                NowLine(time: now)
+            if !nowPlaced && block.start > now {
+                result.append(.now)
+                nowPlaced = true
+            }
+            result.append(.block(block))
+            let end = block.end ?? block.start.addingTimeInterval(30 * 60)
+            latestEnd = max(latestEnd ?? end, end)
+        }
+        if !nowPlaced { result.append(.now) }
+        return result
+    }
+
+    private func timeline(now: Date) -> some View {
+        let isToday = Calendar.current.isDateInToday(selectedDay)
+
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(items(now: now)) { item in
+                switch item {
+                case .now:
+                    NowLine(time: now)
+                case .free(_, let minutes):
+                    FreeRow(minutes: minutes)
+                case .block(let block):
+                    TimelineRow(block: block,
+                                done: isDone(block),
+                                badge: badge(for: block, now: now, isToday: isToday)) {
+                        toggle(block)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if let id = block.eventID {
+                            editingEvent = events.first { $0.id == id }
+                        }
+                    }
+                }
             }
         }
         .padding(.vertical, 14)
         .padding(.trailing, 4)
         .background(Palette.card, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+    }
+}
+
+enum TimelineItem: Identifiable {
+    case block(TimelineBlock)
+    case now
+    case free(id: String, minutes: Int)
+
+    var id: String {
+        switch self {
+        case .block(let block): return block.id
+        case .now: return "now"
+        case .free(let id, _): return id
+        }
+    }
+}
+
+struct FreeRow: View {
+    let minutes: Int
+
+    private var label: String {
+        let h = minutes / 60
+        let m = minutes % 60
+        if h == 0 { return "\(m)m" }
+        return m == 0 ? "\(h)h" : "\(h)h \(m)m"
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Color.clear.frame(width: 50, height: 1)
+            VLine()
+                .stroke(Palette.idle, style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
+                .frame(width: 44)
+            (Text(label).font(.footnote.weight(.bold)).foregroundStyle(Palette.commuteText)
+             + Text(" free").font(.footnote).foregroundStyle(Palette.muted))
+            Spacer()
+        }
+        .frame(height: 36)
+        .padding(.leading, 4)
     }
 }
 

@@ -21,7 +21,11 @@ and Settings → General → VPN & Device Management → trust your developer ce
 - **Commute** — morning departure countdown, afternoon plan per day type, editable usual week.
 - **Food** — log meals (Prepped / Cooked / Ate out) with optional calories and protein,
   home-vs-out count for the week, recipes, and a shopping list for two trips a week.
-- **Gym** — placeholder.
+- **Gym** — Back / Chest / Legs / Cardio templates (editable), set logging prefilled from last time,
+  cardio minutes, workout history, and a "wrap up by" banner for the Caltrain on gym days.
+- **Your own events** — the + button on Today adds one-off or repeating events (daily, weekdays, weekly).
+- **Reminders** — turn on in Commute: 10 min before each departure and your events, plus Sunday prep and wind-down.
+- Timeline shows free gaps of 90+ minutes; water has a 100 oz goal (change in `MySchedule`).
 
 All data stays on the phone (SwiftData). Light and dark mode follow the system setting.
 
@@ -31,8 +35,6 @@ Times live in `Daily/Schedule/Schedule.swift` (`MySchedule`). Caltrain times are
 
 ## Next up
 
-- Gym templates and set logging
-- Notifications before departures
 - Live Caltrain times (511.org API)
 - Apple Health for sleep and water
 - Recipe suggestions from what you have
