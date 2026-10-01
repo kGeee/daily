@@ -61,6 +61,14 @@ enum Pref {
     static let reminderLead = "pref.reminderLead",   reminderLeadDefault = 10
     static let waterGoal = "pref.waterGoal",         waterGoalDefault = 100
     static let eatOutGoal = "pref.eatOutGoal",       eatOutGoalDefault = 2
+    static let calorieGoal = "pref.calorieGoal",     calorieGoalDefault = 2200
+    static let proteinGoal = "pref.proteinGoal",     proteinGoalDefault = 140
+
+    // Live Caltrain (511.org)
+    static let liveStationName = "pref.liveStationName"   // e.g. "San Francisco"
+    static let liveHomeStops = "pref.liveHomeStops"       // comma-separated 511 stop IDs for your station
+    static let liveSunnyvaleStops = "pref.liveSunnyvaleStops"
+    static let directionToWork = "pref.directionToWork",  directionToWorkDefault = "S"
 
     /// Bumped whenever settings change so screens redraw.
     static let revision = "pref.revision"
@@ -118,6 +126,8 @@ enum MySchedule {
     static var reminderLeadMinutes: Int { int(Pref.reminderLead, Pref.reminderLeadDefault) }
     static var waterGoalOz: Int { int(Pref.waterGoal, Pref.waterGoalDefault) }
     static var eatOutGoalPerWeek: Int { int(Pref.eatOutGoal, Pref.eatOutGoalDefault) }
+    static var calorieGoal: Int { int(Pref.calorieGoal, Pref.calorieGoalDefault) }
+    static var proteinGoal: Int { int(Pref.proteinGoal, Pref.proteinGoalDefault) }
 
     /// Usual day type for Mon–Fri, in order.
     static let defaultPattern = "shuttle,gym,gym,shuttle,caltrain"

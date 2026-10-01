@@ -30,6 +30,7 @@ struct CommuteView: View {
                         .pickerStyle(.segmented)
                     }
                     nextCard(now: tl.date)
+                    LiveTrainsCard()
                     if let type = planner.type(for: today) {
                         dayPlanCard(type: type, day: today, now: tl.date)
                     }
@@ -340,5 +341,115 @@ struct CommuteView: View {
             }
         }
         .card()
+    }
+}
+
+/// Live departures from 511.org: your station toward Sunnyvale before noon,
+/// Sunnyvale toward home after.
+struct LiveTrainsCard: View {
+    @AppStorage(Pref.liveStationName) private var stationName = ""
+    @AppStorage(Pref.liveHomeStops) private var homeStops = ""
+    @AppStorage(Pref.liveSunnyvaleStops) private var sunnyvaleStops = ""
+    @AppStorage(Pref.directionToWork) private var directionToWork = Pref.directionToWorkDefault
+
+    @State private var departures: [Caltrain511.Departure] = []
+    @State private var errorText: String?
+    @State private var loading = false
+    @State private var updated: Date?
+
+    private var isMorning: Bool { Calendar.current.component(.hour, from: Date()) < 12 }
+    private var stops: [String] {
+        (isMorning ? homeStops : sunnyvaleStops).split(separator: ",").map(String.init)
+    }
+    private var direction: String {
+        isMorning ? directionToWork : (directionToWork == "S" ? "N" : "S")
+    }
+    private var routeLabel: String {
+        isMorning ? "\(stationName) → Sunnyvale" : "Sunnyvale → \(stationName)"
+    }
+
+    var body: some View {
+        if Keychain.read(Keychain.fiveOneOne)?.isEmpty == false && !stationName.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    SectionLabel(text: "Live · " + routeLabel)
+                    Spacer()
+                    if loading {
+                        ProgressView()
+                    } else {
+                        Button {
+                            Task { await load() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(Palette.commuteText)
+                                .frame(width: 32, height: 32)
+                        }
+                        .accessibilityLabel("Refresh live trains")
+                    }
+                }
+                if let errorText {
+                    Text(errorText).font(.footnote).foregroundStyle(Palette.gymText)
+                } else if departures.isEmpty && !loading {
+                    Text("No live departures right now.")
+                        .font(.footnote)
+                        .foregroundStyle(Palette.muted)
+                }
+                ForEach(departures.prefix(4)) { d in
+                    HStack(spacing: 10) {
+                        Text(d.time.formatted(date: .omitted, time: .shortened))
+                            .font(.subheadline.weight(.heavy).monospacedDigit())
+                            .foregroundStyle(Palette.ink)
+                            .frame(width: 78, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(d.line.isEmpty ? "Caltrain" : d.line)
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(Palette.ink)
+                            Text("to " + d.destination)
+                                .font(.caption)
+                                .foregroundStyle(Palette.muted)
+                        }
+                        Spacer()
+                        delayTag(d)
+                    }
+                }
+                if let updated {
+                    Text("Updated " + updated.formatted(date: .omitted, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(Palette.faint)
+                }
+            }
+            .card()
+            .task { await load() }
+        }
+    }
+
+    private func delayTag(_ d: Caltrain511.Departure) -> some View {
+        let delay = d.delayMinutes
+        let text: String
+        let color: Color
+        if let delay, delay >= 2 {
+            text = "+\(delay) min"
+            color = Palette.gymText
+        } else if delay != nil {
+            text = "On time"
+            color = Palette.foodText
+        } else {
+            text = "Scheduled"
+            color = Palette.muted
+        }
+        return Text(text).font(.caption.weight(.bold)).foregroundStyle(color)
+    }
+
+    private func load() async {
+        loading = true
+        errorText = nil
+        do {
+            departures = try await Caltrain511.departures(stopIDs: stops, direction: direction)
+            updated = Date()
+        } catch {
+            errorText = error.localizedDescription
+        }
+        loading = false
     }
 }

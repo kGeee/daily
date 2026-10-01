@@ -9,12 +9,27 @@ struct FoodView: View {
     }
 
     @State private var tab: Tab = .today
+    @State private var showReview = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeader(eyebrow: Date().formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()),
-                             title: "Food")
+                HStack(alignment: .bottom) {
+                    ScreenHeader(eyebrow: Date().formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()),
+                                 title: "Food")
+                    Spacer()
+                    Button {
+                        showReview = true
+                    } label: {
+                        Label("Review", systemImage: "chart.bar.xaxis")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(Palette.foodText)
+                            .padding(.horizontal, 12)
+                            .frame(height: 34)
+                            .background(Palette.foodTint, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
                 Picker("Section", selection: $tab) {
                     ForEach(Tab.allCases) { t in
                         Text(t.rawValue).tag(t)
@@ -30,6 +45,9 @@ struct FoodView: View {
             .padding(16)
         }
         .background(Palette.bg.ignoresSafeArea())
+        .sheet(isPresented: $showReview) {
+            WeekReviewView()
+        }
     }
 }
 
@@ -114,8 +132,10 @@ struct FoodTodaySection: View {
             SectionLabel(text: "Today")
                 .padding(.top, 4)
             HStack(spacing: 8) {
-                miniStat(label: "Calories", value: calories > 0 ? calories.formatted() : "—")
-                miniStat(label: "Protein", value: protein > 0 ? "\(protein)g" : "—")
+                miniStat(label: "Calories", value: "\(calories > 0 ? calories.formatted() : "0")/\(MySchedule.calorieGoal.formatted())",
+                         progress: Double(calories) / Double(max(MySchedule.calorieGoal, 1)))
+                miniStat(label: "Protein", value: "\(protein)/\(MySchedule.proteinGoal)g",
+                         progress: Double(protein) / Double(max(MySchedule.proteinGoal, 1)))
                 miniStat(label: "Carbs", value: carbs > 0 ? "\(carbs)g" : "—")
                 miniStat(label: "Fat", value: fat > 0 ? "\(fat)g" : "—")
             }
@@ -123,12 +143,20 @@ struct FoodTodaySection: View {
         .card()
     }
 
-    private func miniStat(label: String, value: String) -> some View {
+    private func miniStat(label: String, value: String, progress: Double? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(Palette.muted)
-            Text(value).font(.subheadline.weight(.heavy)).foregroundStyle(Palette.ink)
+            Text(value)
+                .font(.subheadline.weight(.heavy))
+                .foregroundStyle(Palette.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            if let progress {
+                GoalBar(progress: progress, color: Palette.food)
+                    .padding(.top, 2)
+            }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -392,5 +420,21 @@ struct LogMealSheet: View {
                                  carbs: Int(carbs),
                                  fat: Int(fat)))
         dismiss()
+    }
+}
+
+struct GoalBar: View {
+    let progress: Double
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Palette.idle)
+                Capsule().fill(progress > 1.1 ? Palette.gym : color)
+                    .frame(width: geo.size.width * min(max(progress, 0), 1))
+            }
+        }
+        .frame(height: 4)
     }
 }

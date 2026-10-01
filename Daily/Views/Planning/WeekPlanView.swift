@@ -17,6 +17,7 @@ struct WeekPlanView: View {
 
     @State private var weekOffset: Int
     @State private var groceryMessage: String?
+    @State private var showAIPlanner = false
 
     init(startOnNextWeek: Bool = false) {
         _weekOffset = State(initialValue: startOnNextWeek ? 1 : 0)
@@ -44,6 +45,26 @@ struct WeekPlanView: View {
                     }
                     .pickerStyle(.segmented)
 
+                    Button {
+                        showAIPlanner = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "sparkles")
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Plan my prep with AI").font(.subheadline.weight(.bold))
+                                Text("Picks recipes, fills empty meals, builds the grocery list")
+                                    .font(.caption)
+                                    .opacity(0.85)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(Palette.onAccent)
+                        .padding(14)
+                        .background(Palette.food, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
                     summaryCard
                     let gym = gymRotation()
                     ForEach(days, id: \.self) { day in
@@ -53,6 +74,9 @@ struct WeekPlanView: View {
                 .padding(16)
             }
             .background(Palette.bg.ignoresSafeArea())
+            .sheet(isPresented: $showAIPlanner) {
+                AIPrepPlannerView(days: days)
+            }
             .navigationTitle("Plan the week")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -6,9 +6,10 @@ import CoreGraphics
 /// Stores the Anthropic API key in the iPhone's Keychain (never in plain settings).
 enum Keychain {
     private static let service = "daily.anthropic"
-    private static let account = "apiKey"
+    static let anthropic = "apiKey"
+    static let fiveOneOne = "511Key"
 
-    static func read() -> String? {
+    static func read(_ account: String = anthropic) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -22,8 +23,8 @@ enum Keychain {
         return String(data: data, encoding: .utf8)
     }
 
-    static func save(_ value: String) {
-        delete()
+    static func save(_ value: String, account: String = anthropic) {
+        delete(account)
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else { return }
         let item: [String: Any] = [
@@ -36,7 +37,7 @@ enum Keychain {
         SecItemAdd(item as CFDictionary, nil)
     }
 
-    static func delete() {
+    static func delete(_ account: String = anthropic) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -67,20 +68,21 @@ enum AIClient {
     static let model = "claude-haiku-4-5-20251001"
 
     static func structured<T: Decodable>(prompt: String, toolName: String, toolDescription: String,
-                                         schema: [String: Any], as type: T.Type) async throws -> T {
+                                         schema: [String: Any], as type: T.Type,
+                                         maxTokens: Int = 4096) async throws -> T {
         guard let key = Keychain.read(), !key.isEmpty else { throw AIError.noKey }
         guard let url = URL(string: "https://api.anthropic.com/v1/messages") else { throw AIError.badResponse }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 60
+        request.timeoutInterval = 120
         request.setValue(key, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "content-type")
 
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 4096,
+            "max_tokens": maxTokens,
             "tools": [[
                 "name": toolName,
                 "description": toolDescription,

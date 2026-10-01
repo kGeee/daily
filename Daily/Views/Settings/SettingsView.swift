@@ -1,4 +1,6 @@
 import SwiftUI
+import SwiftData
+import UniformTypeIdentifiers
 
 /// A time-of-day picker bound to "minutes after midnight".
 struct TimeField: View {
@@ -82,6 +84,16 @@ struct TrainTimesSection: View {
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
+    @AppStorage(Pref.calorieGoal) private var calorieGoal = Pref.calorieGoalDefault
+    @AppStorage(Pref.proteinGoal) private var proteinGoal = Pref.proteinGoalDefault
+    @AppStorage(Pref.liveStationName) private var liveStationName = ""
+    @AppStorage(Pref.directionToWork) private var directionToWork = Pref.directionToWorkDefault
+    @State private var key511 = Keychain.read(Keychain.fiveOneOne) ?? ""
+    @State private var exportURL: URL?
+    @State private var backupMessage: String?
+    @State private var importing = false
+    @State private var pendingRestore: URL?
 
     @AppStorage(Pref.wake) private var wake = Pref.wakeDefault
     @AppStorage(Pref.workStart) private var workStart = Pref.workStartDefault
@@ -177,6 +189,59 @@ struct SettingsView: View {
                     Text("Used to import recipes from Instagram, estimate calories and macros, and read recipe text. Stored in your iPhone's Keychain and sent only to Anthropic. Usage is billed to your Anthropic account.")
                 }
 
+                Section {
+                    SecureField("511.org API key", text: $key511)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: key511) { _, newValue in
+                            Keychain.save(newValue, account: Keychain.fiveOneOne)
+                        }
+                    NavigationLink {
+                        StationPickerView()
+                    } label: {
+                        HStack {
+                            Text("Home station")
+                            Spacer()
+                            Text(liveStationName.isEmpty ? "Choose" : liveStationName).foregroundStyle(Palette.muted)
+                        }
+                    }
+                    Picker("To Sunnyvale I ride", selection: $directionToWork) {
+                        Text("Southbound").tag("S")
+                        Text("Northbound").tag("N")
+                    }
+                    if let url = URL(string: "https://511.org/open-data/token") {
+                        Link("Get a free 511 key", destination: url)
+                    }
+                } header: {
+                    Text("Live Caltrain")
+                } footer: {
+                    Text("Shows live departures and delays on the Commute screen. Your saved train times above are still used for planning.")
+                }
+
+                Section {
+                    Button("Create backup file") {
+                        do {
+                            exportURL = try Backup.export(context: context)
+                            backupMessage = nil
+                        } catch {
+                            backupMessage = error.localizedDescription
+                        }
+                    }
+                    if let exportURL {
+                        ShareLink(item: exportURL) {
+                            Label("Save or send the backup", systemImage: "square.and.arrow.up")
+                        }
+                    }
+                    Button("Restore from a backup…") { importing = true }
+                    if let backupMessage {
+                        Text(backupMessage).font(.footnote).foregroundStyle(Palette.muted)
+                    }
+                } header: {
+                    Text("Backup")
+                } footer: {
+                    Text("Save the file to iCloud Drive or Files every so often. Restoring replaces everything in the app with the backup.")
+                }
+
                 Section("Your day") {
                     TimeField(title: "Wake up", minutes: $wake)
                     TimeField(title: "Start work", minutes: $workStart)
@@ -200,6 +265,20 @@ struct SettingsView: View {
                             Text("\(waterGoal) oz").foregroundStyle(Palette.muted)
                         }
                     }
+                    Stepper(value: $calorieGoal, in: 1200...4500, step: 50) {
+                        HStack {
+                            Text("Calories a day")
+                            Spacer()
+                            Text(calorieGoal.formatted()).foregroundStyle(Palette.muted)
+                        }
+                    }
+                    Stepper(value: $proteinGoal, in: 40...300, step: 5) {
+                        HStack {
+                            Text("Protein a day")
+                            Spacer()
+                            Text("\(proteinGoal) g").foregroundStyle(Palette.muted)
+                        }
+                    }
                     Stepper(value: $eatOutGoal, in: 0...14) {
                         HStack {
                             Text("Eat out at most")
@@ -218,5 +297,70 @@ struct SettingsView: View {
             }
         }
         .onDisappear { revision += 1 }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+            if case .success(let url) = result { pendingRestore = url }
+        }
+        .confirmationDialog("Replace everything with this backup?",
+                            isPresented: Binding(get: { pendingRestore != nil }, set: { if !$0 { pendingRestore = nil } }),
+                            titleVisibility: .visible) {
+            Button("Replace all data", role: .destructive) {
+                guard let url = pendingRestore else { return }
+                do {
+                    let count = try Backup.restore(from: url, context: context)
+                    backupMessage = "Restored (\(count) meals, recipes, workouts and events)."
+                } catch {
+                    backupMessage = "Couldn't restore: " + error.localizedDescription
+                }
+                pendingRestore = nil
+            }
+        }
+    }
+}
+
+struct StationPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @AppStorage(Pref.liveStationName) private var liveStationName = ""
+    @AppStorage(Pref.liveHomeStops) private var liveHomeStops = ""
+    @AppStorage(Pref.liveSunnyvaleStops) private var liveSunnyvaleStops = ""
+    @State private var stations: [Caltrain511.Station] = []
+    @State private var errorText: String?
+    @State private var loading = true
+
+    var body: some View {
+        List {
+            if loading {
+                HStack { ProgressView(); Text("Loading stations…").foregroundStyle(Palette.muted) }
+            }
+            if let errorText {
+                Text(errorText).foregroundStyle(Palette.gymText)
+            }
+            ForEach(stations) { station in
+                Button {
+                    liveStationName = station.name
+                    liveHomeStops = station.stopIDs.joined(separator: ",")
+                    if let sunnyvale = stations.first(where: { $0.name.localizedCaseInsensitiveContains("Sunnyvale") }) {
+                        liveSunnyvaleStops = sunnyvale.stopIDs.joined(separator: ",")
+                    }
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(station.name).foregroundStyle(Palette.ink)
+                        Spacer()
+                        if station.name == liveStationName {
+                            Image(systemName: "checkmark").foregroundStyle(Palette.commute)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Home station")
+        .task {
+            do {
+                stations = try await Caltrain511.stations()
+            } catch {
+                errorText = error.localizedDescription
+            }
+            loading = false
+        }
     }
 }

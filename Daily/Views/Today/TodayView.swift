@@ -15,6 +15,7 @@ struct TodayView: View {
     @State private var editingEvent: CustomEvent?
     @State private var showNewEvent = false
     @State private var showWeekPlan = false
+    @State private var showReview = false
     @Query private var plans: [MealPlan]
     @AppStorage(Pref.revision) private var revision = 0
 
@@ -29,6 +30,25 @@ struct TodayView: View {
                     header
                     WeekStrip(selected: $selectedDay, planner: planner)
                     statsRow
+                    goalsRow
+                    if Calendar.current.isDateInToday(selectedDay),
+                       Calendar.current.component(.weekday, from: tl.date) == 1 {
+                        Button {
+                            showReview = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "chart.bar.xaxis")
+                                Text("Your week in review is ready")
+                                    .font(.subheadline.weight(.bold))
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.caption.weight(.bold))
+                            }
+                            .foregroundStyle(Palette.foodText)
+                            .padding(14)
+                            .background(Palette.foodTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
                     if Calendar.current.isDateInToday(selectedDay),
                        Calendar.current.component(.hour, from: tl.date) >= 17 {
                         tomorrowCard(now: tl.date)
@@ -57,6 +77,9 @@ struct TodayView: View {
         }
         .sheet(isPresented: $showWeekPlan) {
             WeekPlanView()
+        }
+        .sheet(isPresented: $showReview) {
+            WeekReviewView()
         }
         .sheet(isPresented: $showNewEvent) {
             EventEditor(event: nil, defaultDay: selectedDay)
@@ -164,6 +187,34 @@ struct TodayView: View {
             statPill(label: "Ate out", value: "\(ateOutThisWeek)×", color: Palette.gymText)
             statPill(label: "Slept", value: "—", color: Palette.sleepText)
         }
+    }
+
+    private var goalsRow: some View {
+        let todays = food.filter { Calendar.current.isDate($0.date, inSameDayAs: selectedDay) }
+        let calories = todays.compactMap { $0.calories }.reduce(0, +)
+        let protein = todays.compactMap { $0.protein }.reduce(0, +)
+        return HStack(spacing: 8) {
+            goalPill(label: "Cal", value: "\(calories.formatted())/\(MySchedule.calorieGoal.formatted())",
+                     progress: Double(calories) / Double(max(MySchedule.calorieGoal, 1)), color: Palette.food)
+            goalPill(label: "Protein", value: "\(protein)/\(MySchedule.proteinGoal)g",
+                     progress: Double(protein) / Double(max(MySchedule.proteinGoal, 1)), color: Palette.food)
+        }
+    }
+
+    private func goalPill(label: String, value: String, progress: Double, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Text(label).font(.caption2.weight(.bold)).foregroundStyle(Palette.muted)
+                Spacer(minLength: 0)
+                Text(value).font(.caption.weight(.bold)).foregroundStyle(Palette.ink)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+            }
+            GoalBar(progress: progress, color: color)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func statPill(label: String, value: String, color: Color) -> some View {
