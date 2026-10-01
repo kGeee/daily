@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 struct RecipeDetailView: View {
     @Environment(\.dismiss) private var dismiss
@@ -195,6 +196,8 @@ struct ImportRecipeView: View {
     @State private var status: String?
     @State private var parsed: ParsedRecipe?
     @State private var slot: MealSlot = .dinner
+    @State private var photoItems: [PhotosPickerItem] = []
+    @State private var readingPhotos = false
 
     var body: some View {
         NavigationStack {
@@ -224,12 +227,20 @@ struct ImportRecipeView: View {
                 }
 
                 Section {
-                    TextField("Paste the caption or recipe text here", text: $text, axis: .vertical)
+                    PhotosPicker(selection: $photoItems, maxSelectionCount: 8, matching: .images) {
+                        HStack {
+                            Label(readingPhotos ? "Reading screenshots…" : "Add screenshots", systemImage: "photo.on.rectangle")
+                            Spacer()
+                            if readingPhotos { ProgressView() }
+                        }
+                    }
+                    .disabled(readingPhotos)
+                    TextField("Or paste / type the recipe text here", text: $text, axis: .vertical)
                         .lineLimit(5...14)
                 } header: {
-                    Text("2 · The recipe text")
+                    Text("2 · The recipe text (if the link alone doesn't work)")
                 } footer: {
-                    Text("Instagram often hides captions from apps. If the import can't read it, open the reel, tap … → Copy caption (or select the caption text) and paste it here. Recipes that are only spoken in the video need the steps typed or pasted.")
+                    Text("Instagram doesn't let you copy captions. Instead, open the caption (tap \"more\") and screenshot it, plus any frames of the video that show ingredients or steps. The text is read on your phone and added above. Leave this empty to try the link by itself.")
                 }
 
                 Section {
@@ -267,6 +278,9 @@ struct ImportRecipeView: View {
                     }
                 }
             }
+            .onChange(of: photoItems) { _, items in
+                readScreenshots(items)
+            }
             .navigationTitle("Import recipe")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -278,6 +292,30 @@ struct ImportRecipeView: View {
                         .disabled(parsed == nil)
                 }
             }
+        }
+    }
+
+    private func readScreenshots(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        readingPhotos = true
+        Task {
+            var chunks: [String] = []
+            for item in items {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data)?.cgImage {
+                    let found = await ScreenshotText.recognize(in: image)
+                    if !found.isEmpty { chunks.append(found) }
+                }
+            }
+            let combined = chunks.joined(separator: "\n\n")
+            if !combined.isEmpty {
+                text = text.isEmpty ? combined : text + "\n\n" + combined
+                status = "Read text from \(chunks.count) screenshot\(chunks.count == 1 ? "" : "s"). Tap Read recipe."
+            } else {
+                status = "Couldn't find text in those images."
+            }
+            photoItems = []
+            readingPhotos = false
         }
     }
 

@@ -1,5 +1,7 @@
 import Foundation
 import Security
+import Vision
+import CoreGraphics
 
 /// Stores the Anthropic API key in the iPhone's Keychain (never in plain settings).
 enum Keychain {
@@ -213,15 +215,63 @@ enum InstagramFetcher {
         return detector.firstMatch(in: text, options: [], range: range)?.url
     }
 
-    /// Best-effort: reads the post's public caption from the page's preview tags.
-    /// Instagram often hides this behind a login, so the caller should fall back to pasted text.
+    /// Best-effort caption lookup: first the public embed page (full caption),
+    /// then the post page's preview tags (often shortened). Returns nil if Instagram blocks both.
     static func caption(for url: URL) async -> String? {
+        if let code = shortcode(in: url), let embedded = await embedCaption(code: code) {
+            return embedded
+        }
+        return await previewCaption(for: url)
+    }
+
+    /// The post ID in links like instagram.com/reel/ABC123/ or /p/ABC123/.
+    static func shortcode(in url: URL) -> String? {
+        let parts = url.pathComponents.filter { $0 != "/" }
+        guard let index = parts.firstIndex(where: { ["p", "reel", "reels", "tv"].contains($0) }),
+              index + 1 < parts.count else { return nil }
+        return parts[index + 1]
+    }
+
+    private static func embedCaption(code: String) async -> String? {
+        guard let url = URL(string: "https://www.instagram.com/p/\(code)/embed/captioned/"),
+              let html = await fetch(url) else { return nil }
+        let patterns = [
+            "class=\"Caption\"[^>]*>([\\s\\S]*?)<div class=\"CaptionComments",
+            "class=\"Caption\"[^>]*>([\\s\\S]*?)</div>"
+        ]
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+            let range = NSRange(html.startIndex..., in: html)
+            guard let match = regex.firstMatch(in: html, options: [], range: range),
+                  let inner = Range(match.range(at: 1), in: html) else { continue }
+            let text = plainText(fromHTML: String(html[inner]))
+            if text.count > 30 { return text }
+        }
+        return nil
+    }
+
+    private static func plainText(fromHTML html: String) -> String {
+        var text = html
+            .replacingOccurrences(of: "<br />", with: "\n")
+            .replacingOccurrences(of: "<br/>", with: "\n")
+            .replacingOccurrences(of: "<br>", with: "\n")
+        if let tags = try? NSRegularExpression(pattern: "<[^>]+>") {
+            text = tags.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        }
+        return decodeEntities(text).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func fetch(_ url: URL) async -> String? {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
                          forHTTPHeaderField: "User-Agent")
-        guard let result = try? await URLSession.shared.data(for: request),
-              let html = String(data: result.0, encoding: .utf8) else { return nil }
+        guard let result = try? await URLSession.shared.data(for: request) else { return nil }
+        return String(data: result.0, encoding: .utf8)
+    }
+
+    private static func previewCaption(for url: URL) async -> String? {
+        guard let html = await fetch(url) else { return nil }
 
         for property in ["og:description", "description", "twitter:description"] {
             if let value = metaContent(in: html, key: property), value.count > 40 {
@@ -274,5 +324,24 @@ enum InstagramFetcher {
             result = output
         }
         return result.replacingOccurrences(of: "&amp;", with: "&")
+    }
+}
+
+// MARK: - Reading text from screenshots (on device)
+
+enum ScreenshotText {
+    /// Reads all the text in an image with Apple's on-device text recognition.
+    static func recognize(in image: CGImage) async -> String {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let request = VNRecognizeTextRequest()
+                request.recognitionLevel = .accurate
+                request.usesLanguageCorrection = true
+                let handler = VNImageRequestHandler(cgImage: image, orientation: .up)
+                try? handler.perform([request])
+                let lines = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+                continuation.resume(returning: lines.joined(separator: "\n"))
+            }
+        }
     }
 }
