@@ -10,6 +10,8 @@ struct NowEntry: TimelineEntry {
     let state: NowPlan.State
     /// The next few things after the current one.
     let upcoming: [SharedStore.Item]
+    /// A running or paused pomodoro (shown instead of the timeline item).
+    var focus: Pomodoro.Active? = nil
 }
 
 struct NowProvider: TimelineProvider {
@@ -25,23 +27,28 @@ struct NowProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (NowEntry) -> Void) {
-        completion(context.isPreview ? placeholder(in: context) : entry(at: Date(), items: SharedStore.currentItems()))
+        completion(context.isPreview ? placeholder(in: context)
+                   : entry(at: Date(), items: SharedStore.currentItems(), focus: SharedStore.activeFocus))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<NowEntry>) -> Void) {
         let now = Date()
         let items = SharedStore.currentItems()
+        let focus = SharedStore.activeFocus
         // A new entry every time something starts or ends; the countdowns tick on their own in between.
-        let dates = [now] + NowPlan.changeDates(after: now, items: items).prefix(30)
-        let entries = dates.map { entry(at: $0, items: items) }
+        var changes = NowPlan.changeDates(after: now, items: items)
+        if let focus, !focus.isPaused, focus.end > now { changes.append(focus.end) }
+        let dates = [now] + changes.sorted().prefix(30)
+        let entries = dates.map { entry(at: $0, items: items, focus: focus) }
         let policy: TimelineReloadPolicy = dates.count > 1 ? .atEnd : .after(now.addingTimeInterval(3600))
         completion(Timeline(entries: entries, policy: policy))
     }
 
-    private func entry(at date: Date, items: [SharedStore.Item]) -> NowEntry {
+    private func entry(at date: Date, items: [SharedStore.Item], focus: Pomodoro.Active?) -> NowEntry {
         let state = NowPlan.state(at: date, items: items)
         let upcoming = items.filter { !$0.done && $0.start > date }.sorted { $0.start < $1.start }
-        return NowEntry(date: date, state: state, upcoming: Array(upcoming.prefix(3)))
+        let liveFocus = focus.flatMap { $0.isPaused || $0.end > date ? $0 : nil }
+        return NowEntry(date: date, state: state, upcoming: Array(upcoming.prefix(3)), focus: liveFocus)
     }
 }
 
@@ -89,7 +96,53 @@ struct NowWidgetView: View {
 
     @ViewBuilder
     private var main: some View {
-        if let current = entry.state.current {
+        if let focus = entry.focus {
+            let color = Color.category(focus.phase == .focus ? "focus" : "break")
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    ZStack {
+                        Circle().fill(Color.widgetCircle)
+                        Image(systemName: focus.phase.symbol)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(color)
+                    }
+                    .frame(width: 30, height: 30)
+                    Spacer()
+                    Text(focus.isPaused ? "PAUSED" : "POMODORO")
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(color)
+                }
+                Spacer(minLength: 0)
+                Text(focus.phase == .focus && !focus.label.isEmpty ? focus.label : focus.phase.title)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Group {
+                    if let paused = focus.pausedRemaining {
+                        Text(Pomodoro.clock(paused))
+                    } else {
+                        Text(timerInterval: focus.virtualStart...focus.end, countsDown: true)
+                    }
+                }
+                .font(.system(size: 26, weight: .heavy).monospacedDigit())
+                .foregroundStyle(.white)
+                .minimumScaleFactor(0.7)
+                if focus.isPaused {
+                    ProgressView(value: Pomodoro.progress(focus, at: entry.date)).tint(color)
+                } else {
+                    ProgressView(timerInterval: focus.virtualStart...focus.end, countsDown: false) {
+                        EmptyView()
+                    } currentValueLabel: {
+                        EmptyView()
+                    }
+                    .tint(color)
+                }
+                Text(focus.phase == .focus ? "Round \(focus.round)" : "Break")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        } else if let current = entry.state.current {
             let end = NowPlan.end(of: current)
             VStack(alignment: .leading, spacing: 4) {
                 header(current, label: "NOW")
@@ -237,6 +290,36 @@ struct NowWidget: Widget {
 
 // MARK: - Now Live Activity (Lock Screen + Dynamic Island)
 
+/// Time left on the card; a fixed value while a pomodoro is paused.
+struct NowTimerText: View {
+    let state: NowAttributes.ContentState
+
+    var body: some View {
+        if let paused = state.pausedRemaining {
+            Text(Pomodoro.clock(paused))
+        } else {
+            Text(timerInterval: state.start...state.end, countsDown: true)
+        }
+    }
+}
+
+struct NowProgressBar: View {
+    let state: NowAttributes.ContentState
+
+    var body: some View {
+        if let paused = state.pausedRemaining {
+            let total = max(state.end.timeIntervalSince(state.start), 1)
+            ProgressView(value: min(max(1 - paused / total, 0), 1))
+        } else {
+            ProgressView(timerInterval: state.start...state.end, countsDown: false) {
+                EmptyView()
+            } currentValueLabel: {
+                EmptyView()
+            }
+        }
+    }
+}
+
 struct NowLockScreenView: View {
     let state: NowAttributes.ContentState
     let isStale: Bool
@@ -264,23 +347,19 @@ struct NowLockScreenView: View {
                     }
                     Spacer(minLength: 4)
                     VStack(alignment: .trailing, spacing: 0) {
-                        Text(timerInterval: state.start...state.end, countsDown: true)
+                        NowTimerText(state: state)
                             .font(.system(size: 28, weight: .heavy).monospacedDigit())
                             .foregroundStyle(.white)
                             .multilineTextAlignment(.trailing)
                             .frame(maxWidth: 120, alignment: .trailing)
-                        Text(state.isUpcoming ? "to go" : "left")
+                        Text(state.pausedRemaining != nil ? "paused" : (state.isUpcoming ? "to go" : "left"))
                             .font(.caption2)
                             .foregroundStyle(.white.opacity(0.6))
                     }
                 }
                 if !state.isUpcoming {
-                    ProgressView(timerInterval: state.start...state.end, countsDown: false) {
-                        EmptyView()
-                    } currentValueLabel: {
-                        EmptyView()
-                    }
-                    .tint(color)
+                    NowProgressBar(state: state)
+                        .tint(color)
                     HStack {
                         if let next = state.nextTitle, let at = state.nextStart {
                             Text("Then \(next) · \(at.formatted(date: .omitted, time: .shortened))")
@@ -289,7 +368,11 @@ struct NowLockScreenView: View {
                                 .lineLimit(1)
                         }
                         Spacer()
-                        pill("Done", symbol: "checkmark", intent: NowDoneIntent(itemID: state.itemID))
+                        if state.itemID == NowActivity.focusItemID {
+                            pill("Stop", symbol: "stop.fill", intent: NowDoneIntent(itemID: state.itemID))
+                        } else {
+                            pill("Done", symbol: "checkmark", intent: NowDoneIntent(itemID: state.itemID))
+                        }
                     }
                 }
             }
@@ -372,7 +455,7 @@ struct NowLiveActivity: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(timerInterval: state.start...state.end, countsDown: true)
+                    NowTimerText(state: state)
                         .font(.title3.weight(.heavy).monospacedDigit())
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 90, alignment: .trailing)
@@ -380,12 +463,8 @@ struct NowLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     if !state.isUpcoming {
                         VStack(alignment: .leading, spacing: 6) {
-                            ProgressView(timerInterval: state.start...state.end, countsDown: false) {
-                                EmptyView()
-                            } currentValueLabel: {
-                                EmptyView()
-                            }
-                            .tint(color)
+                            NowProgressBar(state: state)
+                                .tint(color)
                             if let next = state.nextTitle, let at = state.nextStart {
                                 Text("Then \(next) · \(at.formatted(date: .omitted, time: .shortened))")
                                     .font(.caption)
@@ -398,7 +477,7 @@ struct NowLiveActivity: Widget {
             } compactLeading: {
                 Image(systemName: state.symbol).foregroundStyle(color)
             } compactTrailing: {
-                Text(timerInterval: state.start...state.end, countsDown: true)
+                NowTimerText(state: state)
                     .monospacedDigit()
                     .frame(maxWidth: 56)
                     .foregroundStyle(color)

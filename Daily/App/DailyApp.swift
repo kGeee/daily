@@ -18,7 +18,8 @@ struct DailyApp: App {
             MealPlan.self,
             WorkoutTemplate.self,
             WorkoutSession.self,
-            SetLog.self
+            SetLog.self,
+            FocusSession.self
         ])
     }
 }
@@ -65,6 +66,8 @@ struct RootView: View {
                 .tabItem { Label("Gym", systemImage: "dumbbell") }
             FoodView()
                 .tabItem { Label("Food", systemImage: "fork.knife") }
+            FocusView()
+                .tabItem { Label("Focus", systemImage: "timer") }
         }
         .tint(Palette.commute)
         .task {
@@ -96,6 +99,7 @@ struct RootView: View {
     private func appBecameActive() {
         WidgetSync.mergePendingWater(into: context)
         WidgetSync.mergePendingChecks(into: context, existing: checks)
+        FocusController.settle(context: context)
         if SharedStore.takeAddEventRequest() { addingEvent = true }
         if pendingImport == nil, let next = SharedStore.takePendingImports().last {
             pendingImport = next

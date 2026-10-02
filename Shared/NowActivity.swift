@@ -2,6 +2,7 @@ import Foundation
 import ActivityKit
 import AppIntents
 import WidgetKit
+import UserNotifications
 
 /// The Lock Screen / Dynamic Island card for whatever you're doing right now.
 struct NowAttributes: ActivityAttributes {
@@ -21,13 +22,34 @@ struct NowAttributes: ActivityAttributes {
         var nextTitle: String?
         var nextSymbol: String?
         var nextStart: Date?
+        /// Set while a pomodoro is paused: seconds left, shown instead of a running timer.
+        var pausedRemaining: Double? = nil
     }
 }
 
 /// Starts, updates and ends the "Now" Live Activity from the shared timeline.
 enum NowActivity {
+    /// The item id used for a running pomodoro.
+    static let focusItemID = "focus"
+    /// Notification id for "pomodoro finished".
+    static let focusNotificationID = "daily.focus.end"
+
     /// What the Live Activity should show, or nil when there's nothing on or coming up soon.
-    static func content(for state: NowPlan.State, at date: Date) -> NowAttributes.ContentState? {
+    static func content(for state: NowPlan.State, at date: Date,
+                        focus: Pomodoro.Active? = nil) -> NowAttributes.ContentState? {
+        // A running pomodoro takes over the card.
+        if let focus, focus.isPaused || focus.end > date {
+            let label = focus.label.trimmingCharacters(in: .whitespaces)
+            let next = Pomodoro.next(after: focus.phase, round: focus.round, settings: Pomodoro.Settings.load())
+            return NowAttributes.ContentState(
+                itemID: focusItemID,
+                title: focus.phase == .focus ? (label.isEmpty ? "Focus" : label) : focus.phase.title,
+                subtitle: focus.phase == .focus ? "Pomodoro · round \(focus.round)" : "Pomodoro break",
+                symbol: focus.phase.symbol, category: focus.phase == .focus ? "focus" : "break",
+                start: focus.virtualStart, end: focus.end, isUpcoming: false,
+                nextTitle: next.phase.title, nextSymbol: next.phase.symbol, nextStart: focus.end,
+                pausedRemaining: focus.pausedRemaining)
+        }
         if let current = state.current {
             return NowAttributes.ContentState(
                 itemID: current.id, title: current.title, subtitle: current.subtitle,
@@ -52,12 +74,13 @@ enum NowActivity {
         let activities = Activity<NowAttributes>.activities
         guard SharedStore.nowActivityEnabled,
               ActivityAuthorizationInfo().areActivitiesEnabled,
-              let state = content(for: NowPlan.state(at: date, items: SharedStore.currentItems()), at: date) else {
+              let state = content(for: NowPlan.state(at: date, items: SharedStore.currentItems()), at: date,
+                                  focus: SharedStore.activeFocus) else {
             for activity in activities { await activity.end(nil, dismissalPolicy: .immediate) }
             return
         }
         // Once it ends, the card switches to "up next" by itself (see the widget's stale view).
-        let content = ActivityContent(state: state, staleDate: state.end)
+        let content = ActivityContent(state: state, staleDate: state.pausedRemaining == nil ? state.end : nil)
         if let first = activities.first {
             if first.content.state != state { await first.update(content) }
             for extra in activities.dropFirst() { await extra.end(nil, dismissalPolicy: .immediate) }
@@ -82,7 +105,10 @@ struct NowDoneIntent: LiveActivityIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        if SharedStore.currentItems().first(where: { $0.id == itemID })?.done == false {
+        if itemID == NowActivity.focusItemID {
+            SharedStore.stopFocusFromLockScreen()
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [NowActivity.focusNotificationID])
+        } else if SharedStore.currentItems().first(where: { $0.id == itemID })?.done == false {
             SharedStore.togglePendingCheck(itemID)
         }
         await NowActivity.sync()

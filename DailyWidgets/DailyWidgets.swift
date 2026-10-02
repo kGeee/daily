@@ -74,6 +74,8 @@ extension Color {
         case "food": return Color(hex: 0x3FAE74)
         case "sleep": return Color(hex: 0x8C8CF0)
         case "work": return Color(hex: 0x9AA0AB)
+        case "focus": return Color(hex: 0xF26B5B)
+        case "break": return Color(hex: 0x5BC0DE)
         default: return Color(hex: 0xF07AA8)
         }
     }

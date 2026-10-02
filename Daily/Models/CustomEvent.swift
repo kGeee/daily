@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 enum EventRepeat: String, CaseIterable, Identifiable {
-    case none, daily, weekdays, weekly
+    case none, daily, weekdays, weekly, biweekly, monthly
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -10,6 +10,8 @@ enum EventRepeat: String, CaseIterable, Identifiable {
         case .daily: return "Every day"
         case .weekdays: return "Weekdays"
         case .weekly: return "Every week"
+        case .biweekly: return "Every 2 weeks"
+        case .monthly: return "Every month"
         }
     }
 }
@@ -92,6 +94,15 @@ final class CustomEvent {
             return (2...6).contains(weekday)
         case .weekly:
             return cal.component(.weekday, from: target) == cal.component(.weekday, from: firstDay)
+        case .biweekly:
+            let days = cal.dateComponents([.day], from: firstDay, to: target).day ?? 0
+            return days % 14 == 0
+        case .monthly:
+            // Same date each month; on the 29th–31st it falls on the last day of shorter months.
+            let wanted = cal.component(.day, from: firstDay)
+            let day = cal.component(.day, from: target)
+            let monthLength = cal.range(of: .day, in: .month, for: target)?.count ?? 31
+            return day == min(wanted, monthLength)
         }
     }
 

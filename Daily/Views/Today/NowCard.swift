@@ -8,6 +8,12 @@ struct NowCard: View {
 
     @AppStorage("nowLiveActivity", store: SharedStore.defaults) private var onLockScreen = true
 
+    init(items: [SharedStore.Item], now: Date, onDone: @escaping (SharedStore.Item) -> Void) {
+        self.items = items
+        self.now = now
+        self.onDone = onDone
+    }
+
     var body: some View {
         let state = NowPlan.state(at: now, items: items)
         VStack(alignment: .leading, spacing: 14) {
@@ -170,6 +176,8 @@ struct NowCard: View {
         case "food": return Palette.food
         case "sleep": return Palette.sleep
         case "work": return Palette.work
+        case "focus": return Palette.focus
+        case "break": return Palette.water
         default: return Palette.general
         }
     }

@@ -15,6 +15,7 @@ struct TodayView: View {
     @State private var editingEvent: CustomEvent?
     @State private var showNewEvent = false
     @State private var showWeekPlan = false
+    @State private var showMonth = false
     @State private var showReview = false
     @State private var showSettings = false
     @State private var stepEdit: StepDayEdit?
@@ -87,6 +88,9 @@ struct TodayView: View {
         .sheet(isPresented: $showWeekPlan) {
             WeekPlanView()
         }
+        .sheet(isPresented: $showMonth) {
+            MonthView { day in selectedDay = day }
+        }
         .sheet(isPresented: $showReview) {
             WeekReviewView()
         }
@@ -116,9 +120,19 @@ struct TodayView: View {
             }
             Spacer()
             Button {
-                showWeekPlan = true
+                showMonth = true
             } label: {
                 Image(systemName: "calendar")
+                    .font(.headline)
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 36, height: 36)
+                    .background(Palette.card, in: Circle())
+            }
+            .accessibilityLabel("Month")
+            Button {
+                showWeekPlan = true
+            } label: {
+                Image(systemName: "list.bullet.clipboard")
                     .font(.headline)
                     .foregroundStyle(Palette.ink)
                     .frame(width: 36, height: 36)

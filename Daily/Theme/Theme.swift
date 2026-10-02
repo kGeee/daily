@@ -57,6 +57,10 @@ enum Palette {
     static let generalTint = Color(light: 0xF9E6EE, dark: 0x3A1C29)
 
     static let work = Color(light: 0x6B717D, dark: 0x9AA0AB)
+
+    static let focus = Color(light: 0xC9433A, dark: 0xF26B5B)
+    static let focusTint = Color(light: 0xFBE9E7, dark: 0x3A1E1B)
+    static let focusText = Color(light: 0xA8362E, dark: 0xF7A097)
     static let caltrain = Color(light: 0x6B717D, dark: 0xB9BEC8)
     static let caltrainTint = Color(light: 0xEEF0F3, dark: 0x2A2D34)
 }
