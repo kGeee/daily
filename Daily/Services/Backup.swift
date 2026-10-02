@@ -65,9 +65,9 @@ enum Backup {
         for key in stringKeys { if let v = defaults.string(forKey: key) { file.stringPrefs[key] = v } }
         for key in boolKeys { if defaults.object(forKey: key) != nil { file.boolPrefs[key] = defaults.bool(forKey: key) } }
         for key in timetableKeys { if let v = defaults.string(forKey: key) { file.stringPrefs[key] = v } }
-        var data: [String: Data] = [:]
-        for key in dataKeys { if let v = defaults.data(forKey: key) { data[key] = v } }
-        file.dataPrefs = data
+        var dataPrefs: [String: Data] = [:]
+        for key in dataKeys { if let v = defaults.data(forKey: key) { dataPrefs[key] = v } }
+        file.dataPrefs = dataPrefs
 
         file.food = try context.fetch(FetchDescriptor<FoodEntry>()).map {
             FoodDTO(date: $0.date, slot: $0.slotRaw, name: $0.name, source: $0.sourceRaw,
