@@ -11,3 +11,4 @@
 - Unit tests live in `DailyTests/` (target `DailyTests`, host app `Daily`, shared scheme `Daily`). Add a test with any logic change; keep logic out of views where possible so it can be tested.
 - Commute timelines come from `Routines` (`Daily/Schedule/Routines.swift`): per-DayType lists of `RoutineStep`, resolved by `RoutineResolver` with `Timetables` and one-day `StepOverride`s. Default routines are built from the old `Pref` values. Built-in step ids ("out", "work", "go", "gym", "home") are relied on by check-offs and tests.
 - Signing team is `7CK43PG7GZ` (set in the project generator for every target).
+- "Now" (current block, time left, next) is computed by `NowPlan` (`SharedCore/NowPlan.swift`) from `SharedStore.Item`s. Used by `NowCard` on Today, the `Now` widget, and the `NowAttributes` Live Activity (`Shared/NowActivity.swift`, synced by `NowActivity.sync()` after every `WidgetSync.update`). The Lock Screen toggle is `SharedStore.nowActivityEnabled`.

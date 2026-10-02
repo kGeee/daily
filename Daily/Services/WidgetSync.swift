@@ -28,22 +28,7 @@ enum WidgetSync {
         snapshot.departures = departures
 
         // The next few things on your timeline, across today and the next two days.
-        let done = Set(checks.map { $0.dayKey + "|" + $0.blockID })
-        var items: [SharedStore.Item] = []
-        for offset in 0..<3 {
-            guard let day = cal.date(byAdding: .day, value: offset, to: cal.startOfDay(for: now)) else { continue }
-            let key = DayKey.of(day)
-            let lunch = plans.first { $0.dayKey == key && $0.slot == .lunch }.map { "Planned: " + $0.title }
-            let dinner = plans.first { $0.dayKey == key && $0.slot == .dinner }.map { "Planned: " + $0.title }
-            for block in planner.blocks(for: day, lunchNote: lunch, dinnerNote: dinner, events: events)
-            where (block.end ?? block.start.addingTimeInterval(30 * 60)) > now {
-                items.append(SharedStore.Item(blockID: block.id, dayKey: key, title: block.title, subtitle: block.subtitle,
-                                              start: block.start, end: block.end, symbol: block.symbol,
-                                              category: categoryKey(block.category),
-                                              done: done.contains(key + "|" + block.id)))
-            }
-        }
-        snapshot.items = Array(items.prefix(16))
+        snapshot.items = Array(timelineItems(planner: planner, plans: plans, checks: checks, events: events, now: now).prefix(16))
 
         let todaysFood = food.filter { cal.isDateInToday($0.date) }
         snapshot.calories = todaysFood.compactMap { $0.calories }.reduce(0, +)
@@ -58,6 +43,30 @@ enum WidgetSync {
 
         SharedStore.save(snapshot)
         WidgetCenter.shared.reloadAllTimelines()
+        Task { await NowActivity.sync() }
+    }
+
+    /// Timeline blocks that haven't finished yet, from `now` across `days` days, as shareable items.
+    @MainActor
+    static func timelineItems(planner: DayPlanner, plans: [MealPlan], checks: [BlockCheck],
+                              events: [CustomEvent], now: Date = Date(), days: Int = 3) -> [SharedStore.Item] {
+        let cal = Calendar.current
+        let done = Set(checks.map { $0.dayKey + "|" + $0.blockID })
+        var items: [SharedStore.Item] = []
+        for offset in 0..<days {
+            guard let day = cal.date(byAdding: .day, value: offset, to: cal.startOfDay(for: now)) else { continue }
+            let key = DayKey.of(day)
+            let lunch = plans.first { $0.dayKey == key && $0.slot == .lunch }.map { "Planned: " + $0.title }
+            let dinner = plans.first { $0.dayKey == key && $0.slot == .dinner }.map { "Planned: " + $0.title }
+            for block in planner.blocks(for: day, lunchNote: lunch, dinnerNote: dinner, events: events) {
+                let item = SharedStore.Item(blockID: block.id, dayKey: key, title: block.title, subtitle: block.subtitle,
+                                            start: block.start, end: block.end, symbol: block.symbol,
+                                            category: categoryKey(block.category),
+                                            done: done.contains(key + "|" + block.id))
+                if NowPlan.end(of: item) > now { items.append(item) }
+            }
+        }
+        return items
     }
 
     private static func categoryKey(_ category: BlockCategory) -> String {

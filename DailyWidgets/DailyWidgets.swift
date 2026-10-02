@@ -4,7 +4,7 @@ import ActivityKit
 import AppIntents
 
 // Widget colors mirror Palette in the app (the widget is a separate target).
-private extension Color {
+extension Color {
     init(hex: UInt32) {
         self.init(red: Double((hex >> 16) & 0xFF) / 255, green: Double((hex >> 8) & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
     }
@@ -16,10 +16,12 @@ private extension Color {
 @main
 struct DailyWidgetsBundle: WidgetBundle {
     var body: some Widget {
+        NowWidget()
         TimelineWidget()
         NextUpWidget()
         WaterWidget()
         DepartureLiveActivity()
+        NowLiveActivity()
     }
 }
 
@@ -58,20 +60,14 @@ struct TimelineWidgetProvider: TimelineProvider {
     }
 
     private func entry(at date: Date) -> TimelineWidgetEntry {
-        let pending = SharedStore.pendingChecks()
-        let items = (SharedStore.load().items ?? [])
-            .filter { ($0.end ?? $0.start.addingTimeInterval(30 * 60)) > date }
-            .map { item -> SharedStore.Item in
-                var copy = item
-                if pending.contains(item.id) { copy.done.toggle() }
-                return copy
-            }
+        let items = SharedStore.currentItems().filter { NowPlan.end(of: $0) > date }
         return TimelineWidgetEntry(date: date, items: items)
     }
 }
 
-private extension SharedStore.Item {
-    var color: Color {
+extension Color {
+    /// Category colors (dark-mode Palette values, since the widgets are dark).
+    static func category(_ category: String) -> Color {
         switch category {
         case "commute": return Color(hex: 0x4C8DF0)
         case "gym": return Color(hex: 0xEE7A45)
@@ -81,6 +77,12 @@ private extension SharedStore.Item {
         default: return Color(hex: 0xF07AA8)
         }
     }
+    static let widgetDark = Color(hex: 0x1A1C21)
+    static let widgetCircle = Color(hex: 0x2A2D34)
+}
+
+extension SharedStore.Item {
+    var color: Color { Color.category(category) }
 
     /// How many days after the entry date this item is (for the "+1" mark).
     func daysAhead(from date: Date) -> Int {

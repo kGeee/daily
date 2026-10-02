@@ -31,6 +31,13 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     header
                     WeekStrip(selected: $selectedDay, planner: planner)
+                    if Calendar.current.isDateInToday(selectedDay) {
+                        NowCard(items: WidgetSync.timelineItems(planner: planner, plans: plans, checks: checks,
+                                                                events: events, now: tl.date, days: 2),
+                                now: tl.date) { item in
+                            markDone(item)
+                        }
+                    }
                     statsRow
                     goalsRow
                     if Calendar.current.isDateInToday(selectedDay),
@@ -340,6 +347,11 @@ struct TodayView: View {
         } else {
             context.insert(BlockCheck(dayKey: dayKey, blockID: block.id))
         }
+    }
+
+    private func markDone(_ item: SharedStore.Item) {
+        guard !checks.contains(where: { $0.dayKey == item.dayKey && $0.blockID == item.blockID }) else { return }
+        context.insert(BlockCheck(dayKey: item.dayKey, blockID: item.blockID))
     }
 
     private func badge(for block: TimelineBlock, now: Date, isToday: Bool) -> String? {

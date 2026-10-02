@@ -153,6 +153,25 @@ enum SharedStore {
         return set
     }
 
+    /// The snapshot's timeline items with any widget / Lock Screen check-offs applied.
+    static func currentItems() -> [Item] {
+        let pending = pendingChecks()
+        return (load().items ?? []).map { item in
+            var copy = item
+            if pending.contains(item.id) { copy.done.toggle() }
+            return copy
+        }
+    }
+
+    // MARK: Lock Screen "Now" setting (lives here so the Live Activity button can read it too)
+
+    private static let nowActivityKey = "nowLiveActivity"
+
+    static var nowActivityEnabled: Bool {
+        get { defaults.object(forKey: nowActivityKey) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: nowActivityKey) }
+    }
+
     // MARK: "+" on the widget asks the app to open the new-event screen
 
     private static let openAddEventKey = "openAddEvent"
