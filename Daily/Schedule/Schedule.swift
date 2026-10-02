@@ -68,10 +68,15 @@ enum Pref {
     static let liveStationName = "pref.liveStationName"   // e.g. "San Francisco"
     static let liveHomeStops = "pref.liveHomeStops"       // comma-separated 511 stop IDs for your station
     static let liveSunnyvaleStops = "pref.liveSunnyvaleStops"
+    static let liveMountainViewStops = "pref.liveMountainViewStops"
     static let directionToWork = "pref.directionToWork",  directionToWorkDefault = "S"
 
     /// Bumped whenever settings change so screens redraw.
     static let revision = "pref.revision"
+
+    static func bump() {
+        UserDefaults.standard.set(UserDefaults.standard.integer(forKey: revision) + 1, forKey: revision)
+    }
 
     static func parseTrains(_ raw: String) -> [Int] {
         raw.split(separator: ",").compactMap { Int($0) }.sorted()
@@ -169,7 +174,7 @@ enum MySchedule {
 }
 
 enum DayType: String, CaseIterable, Identifiable {
-    case shuttle, gym, caltrain
+    case shuttle, gym, caltrain, mountainView
     var id: String { rawValue }
 
     var title: String {
@@ -177,6 +182,7 @@ enum DayType: String, CaseIterable, Identifiable {
         case .shuttle: return "Shuttle day"
         case .gym: return "Gym day"
         case .caltrain: return "Caltrain day"
+        case .mountainView: return "Mountain View day"
         }
     }
 
@@ -185,6 +191,7 @@ enum DayType: String, CaseIterable, Identifiable {
         case .shuttle: return "Shuttle"
         case .gym: return "Gym"
         case .caltrain: return "Caltrain"
+        case .mountainView: return "Mtn View"
         }
     }
 
@@ -193,6 +200,7 @@ enum DayType: String, CaseIterable, Identifiable {
         case .shuttle: return Palette.commute
         case .gym: return Palette.gym
         case .caltrain: return Palette.caltrain
+        case .mountainView: return Palette.general
         }
     }
 
@@ -201,6 +209,7 @@ enum DayType: String, CaseIterable, Identifiable {
         case .shuttle: return Palette.commuteTint
         case .gym: return Palette.gymTint
         case .caltrain: return Palette.caltrainTint
+        case .mountainView: return Palette.generalTint
         }
     }
 }
@@ -233,6 +242,8 @@ struct TimelineBlock: Identifiable {
     var eventID: UUID? = nil
     /// When you need to walk out the door (before the departure itself).
     var leaveBy: Date? = nil
+    /// Set for blocks that come from a commute routine (so they can be edited).
+    var routineType: DayType? = nil
 }
 
 enum DayKey {
@@ -281,8 +292,6 @@ struct DayPlanner {
                 gymNote: String? = nil, events: [CustomEvent] = []) -> [TimelineBlock] {
         let d = Calendar.current.startOfDay(for: day)
         let weekday = Calendar.current.component(.weekday, from: d)
-        let walkStop = Double(MySchedule.walkToStopMinutes * 60)
-        let walkStation = Double(MySchedule.walkToStationMinutes * 60)
 
         var out: [TimelineBlock] = [
             TimelineBlock(id: "wake", start: MySchedule.wake.on(d), title: "Rise and shine", category: .sleep, symbol: "alarm.fill")
@@ -292,61 +301,10 @@ struct DayPlanner {
         let dinner = TimelineBlock(id: "dinner", start: MySchedule.dinner.on(d), title: "Dinner",
                                    subtitle: dinnerNote ?? "Nothing planned", category: .food, symbol: "fork.knife")
 
-        let shuttleOut = MySchedule.shuttleOut.on(d)
-        let shuttleOutBlock = TimelineBlock(
-            id: "out", start: shuttleOut, title: "Shuttle to work",
-            subtitle: MySchedule.shuttleStop + " · leave by " + shuttleOut.addingTimeInterval(-walkStop).formatted(date: .omitted, time: .shortened),
-            category: .commute, symbol: "bus.fill", isDeparture: true,
-            leaveBy: shuttleOut.addingTimeInterval(-walkStop))
-
-        switch type(for: d) {
-        case .shuttle?:
-            out += [
-                shuttleOutBlock,
-                TimelineBlock(id: "work", start: MySchedule.workStart.on(d), end: MySchedule.shuttleHome.on(d),
-                              title: "Work", category: .work, symbol: "briefcase.fill"),
-                lunch,
-                TimelineBlock(id: "home", start: MySchedule.shuttleHome.on(d), title: "Shuttle home",
-                              subtitle: "From the work stop", category: .commute, symbol: "bus.fill", isDeparture: true)
-            ]
-        case .gym?:
-            let train = MySchedule.caltrainAfterGym
-            let backups = MySchedule.trains(after: train.time.totalMinutes, count: 1)
-            var trainNote = "From Sunnyvale"
-            if let next = backups.first { trainNote += " · next one " + next.label }
-            out += [
-                shuttleOutBlock,
-                TimelineBlock(id: "work", start: MySchedule.workStart.on(d), end: MySchedule.leaveForGym.on(d),
-                              title: "Work", category: .work, symbol: "briefcase.fill"),
-                lunch,
-                TimelineBlock(id: "go", start: MySchedule.leaveForGym.on(d), title: "Leave for gym",
-                              subtitle: "Skip the " + MySchedule.shuttleHome.label + " shuttle today",
-                              category: .gym, symbol: "arrow.right", isDeparture: true),
-                TimelineBlock(id: "gym", start: MySchedule.gymStart.on(d), end: MySchedule.gymEnd.on(d),
-                              title: "Gym", subtitle: gymNote ?? "", category: .gym, symbol: "dumbbell.fill"),
-                TimelineBlock(id: "home", start: train.time.on(d), title: "Caltrain home",
-                              subtitle: trainNote, category: .commute, symbol: "tram.fill",
-                              isEstimate: train.isEstimate, isDeparture: true,
-                              leaveBy: train.time.on(d).addingTimeInterval(-Double(MySchedule.gymToStationMinutes * 60)))
-            ]
-        case .caltrain?:
-            let morning = MySchedule.caltrainOut
-            let evening = MySchedule.caltrainAfterWork
-            let morningDate = morning.time.on(d)
-            out += [
-                TimelineBlock(id: "out", start: morningDate, title: "Caltrain to Sunnyvale",
-                              subtitle: MySchedule.homeStation + " · leave by " + morningDate.addingTimeInterval(-walkStation).formatted(date: .omitted, time: .shortened),
-                              category: .commute, symbol: "tram.fill", isEstimate: morning.isEstimate, isDeparture: true,
-                              leaveBy: morningDate.addingTimeInterval(-walkStation)),
-                TimelineBlock(id: "work", start: MySchedule.workStart.on(d), end: MySchedule.caltrainLeaveWork.on(d),
-                              title: "Work", category: .work, symbol: "briefcase.fill"),
-                lunch,
-                TimelineBlock(id: "home", start: evening.time.on(d), title: "Caltrain home",
-                              subtitle: "From Sunnyvale", category: .commute, symbol: "tram.fill",
-                              isEstimate: evening.isEstimate, isDeparture: true,
-                              leaveBy: evening.time.on(d).addingTimeInterval(-Double(MySchedule.lastMileMinutes * 60)))
-            ]
-        case nil:
+        if let dayType = type(for: d) {
+            out += RoutineResolver.blocks(for: d, type: dayType, gymNote: gymNote)
+            out.append(lunch)
+        } else {
             out.append(lunch)
             if weekday == 1 {
                 out.append(TimelineBlock(id: "prep", start: MySchedule.prepStart.on(d), end: MySchedule.prepEnd.on(d),

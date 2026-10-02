@@ -34,3 +34,37 @@ struct AddWaterIntent: AppIntent {
         return .result()
     }
 }
+
+/// Check circle on the timeline widget.
+struct ToggleBlockIntent: AppIntent {
+    static var title: LocalizedStringResource = "Check off"
+    static var isDiscoverable: Bool = false
+
+    @Parameter(title: "Item")
+    var itemID: String
+
+    init() {}
+
+    init(itemID: String) {
+        self.itemID = itemID
+    }
+
+    func perform() async throws -> some IntentResult {
+        SharedStore.togglePendingCheck(itemID)
+        WidgetCenter.shared.reloadTimelines(ofKind: "Timeline")
+        return .result()
+    }
+}
+
+/// "+" on the timeline widget: opens the app straight to a new event.
+struct AddEventIntent: AppIntent {
+    static var title: LocalizedStringResource = "Add event"
+    static var openAppWhenRun: Bool = true
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        SharedStore.requestAddEvent()
+        return .result()
+    }
+}

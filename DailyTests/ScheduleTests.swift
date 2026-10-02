@@ -3,8 +3,9 @@ import XCTest
 
 /// Resets every schedule setting so tests start from the defaults.
 func resetPrefs() {
-    let keys = Backup.intKeys + Backup.stringKeys + Backup.boolKeys
+    let keys = Backup.intKeys + Backup.stringKeys + Backup.boolKeys + Backup.dataKeys + Backup.timetableKeys
     for key in keys { UserDefaults.standard.removeObject(forKey: key) }
+    for table in Timetable.defaults { UserDefaults.standard.removeObject(forKey: Timetables.timesKey(table.id)) }
 }
 
 /// A date in the week of Mon Oct 5, 2026. weekdayOffset 0 = Monday … 6 = Sunday.

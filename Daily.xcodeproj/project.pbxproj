@@ -429,9 +429,11 @@
 				CODE_SIGN_ENTITLEMENTS = Config/Daily.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7CK43PG7GZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -458,9 +460,11 @@
 				CODE_SIGN_ENTITLEMENTS = Config/Daily.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7CK43PG7GZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -485,6 +489,7 @@
 				CODE_SIGN_ENTITLEMENTS = Config/Widgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7CK43PG7GZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Widgets-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
@@ -511,6 +516,7 @@
 				CODE_SIGN_ENTITLEMENTS = Config/Widgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7CK43PG7GZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Widgets-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
@@ -537,6 +543,7 @@
 				CODE_SIGN_ENTITLEMENTS = Config/Share.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7CK43PG7GZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Share-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
@@ -563,6 +570,7 @@
 				CODE_SIGN_ENTITLEMENTS = Config/Share.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7CK43PG7GZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Share-Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
@@ -589,6 +597,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7CK43PG7GZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 0.1;
@@ -607,6 +616,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7CK43PG7GZ;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 0.1;

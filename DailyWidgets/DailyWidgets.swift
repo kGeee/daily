@@ -16,9 +16,172 @@ private extension Color {
 @main
 struct DailyWidgetsBundle: WidgetBundle {
     var body: some Widget {
+        TimelineWidget()
         NextUpWidget()
         WaterWidget()
         DepartureLiveActivity()
+    }
+}
+
+// MARK: - Timeline (your next few blocks, with check-offs)
+
+struct TimelineWidgetEntry: TimelineEntry {
+    let date: Date
+    let items: [SharedStore.Item]
+}
+
+struct TimelineWidgetProvider: TimelineProvider {
+    func placeholder(in context: Context) -> TimelineWidgetEntry {
+        let now = Date()
+        let sample = [
+            SharedStore.Item(blockID: "out", dayKey: "", title: "Shuttle to work", subtitle: "Leave by 7:35 AM",
+                             start: now.addingTimeInterval(1800), end: nil, symbol: "bus.fill", category: "commute", done: false),
+            SharedStore.Item(blockID: "lunch", dayKey: "", title: "Lunch", subtitle: "Planned: Turkey chili",
+                             start: now.addingTimeInterval(16000), end: nil, symbol: "fork.knife", category: "food", done: false)
+        ]
+        return TimelineWidgetEntry(date: now, items: sample)
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (TimelineWidgetEntry) -> Void) {
+        completion(entry(at: Date()))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<TimelineWidgetEntry>) -> Void) {
+        let now = Date()
+        let items = SharedStore.load().items ?? []
+        // Move on as each item finishes.
+        var dates = [now]
+        dates += items.map { $0.end ?? $0.start.addingTimeInterval(30 * 60) }.filter { $0 > now }
+        let entries = dates.prefix(15).map { entry(at: $0) }
+        let refresh = Calendar.current.date(byAdding: .hour, value: 3, to: now) ?? now.addingTimeInterval(10800)
+        completion(Timeline(entries: Array(entries), policy: .after(refresh)))
+    }
+
+    private func entry(at date: Date) -> TimelineWidgetEntry {
+        let pending = SharedStore.pendingChecks()
+        let items = (SharedStore.load().items ?? [])
+            .filter { ($0.end ?? $0.start.addingTimeInterval(30 * 60)) > date }
+            .map { item -> SharedStore.Item in
+                var copy = item
+                if pending.contains(item.id) { copy.done.toggle() }
+                return copy
+            }
+        return TimelineWidgetEntry(date: date, items: items)
+    }
+}
+
+private extension SharedStore.Item {
+    var color: Color {
+        switch category {
+        case "commute": return Color(hex: 0x4C8DF0)
+        case "gym": return Color(hex: 0xEE7A45)
+        case "food": return Color(hex: 0x3FAE74)
+        case "sleep": return Color(hex: 0x8C8CF0)
+        case "work": return Color(hex: 0x9AA0AB)
+        default: return Color(hex: 0xF07AA8)
+        }
+    }
+
+    /// How many days after the entry date this item is (for the "+1" mark).
+    func daysAhead(from date: Date) -> Int {
+        let cal = Calendar.current
+        return cal.dateComponents([.day], from: cal.startOfDay(for: date), to: cal.startOfDay(for: start)).day ?? 0
+    }
+}
+
+struct TimelineWidgetView: View {
+    @Environment(\.widgetFamily) private var family
+    let entry: TimelineWidgetEntry
+
+    private var rowCount: Int { family == .systemLarge ? 5 : 2 }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            if entry.items.isEmpty {
+                Text("Nothing coming up")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(entry.items.prefix(rowCount).enumerated()), id: \.element.id) { index, item in
+                        row(item, isLast: index == min(rowCount, entry.items.count) - 1)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            Button(intent: AddEventIntent()) {
+                Image(systemName: "plus")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Color(hex: 0x4C8DF0), in: Circle())
+            }
+            .buttonStyle(.plain)
+        }
+        .containerBackground(Color(hex: 0x1A1C21), for: .widget)
+    }
+
+    private func row(_ item: SharedStore.Item, isLast: Bool) -> some View {
+        let ahead = item.daysAhead(from: entry.date)
+        return HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                if !isLast {
+                    Rectangle()
+                        .fill(Color(hex: 0x2A2D34))
+                        .frame(width: 4)
+                        .frame(maxHeight: .infinity)
+                        .offset(y: 26)
+                }
+                Circle()
+                    .fill(item.done ? item.color : Color(hex: 0x2A2D34))
+                    .frame(width: 44, height: 44)
+                Image(systemName: item.symbol)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(item.done ? Color(hex: 0x1A1C21) : item.color)
+            }
+            .frame(width: 44)
+
+            VStack(alignment: .leading, spacing: 1) {
+                (Text(item.start.formatted(date: .omitted, time: .shortened))
+                 + Text(ahead > 0 ? "+\(ahead)" : "").font(.caption2).baselineOffset(5))
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.6))
+                Text(item.title)
+                    .font(.headline)
+                    .foregroundStyle(item.done ? Color.white.opacity(0.5) : Color.white)
+                    .strikethrough(item.done)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Button(intent: ToggleBlockIntent(itemID: item.id)) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(item.color, lineWidth: 2.5)
+                        .background(Circle().fill(item.done ? item.color : Color.clear))
+                    if item.done {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .heavy))
+                            .foregroundStyle(Color(hex: 0x1A1C21))
+                    }
+                }
+                .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, isLast ? 52 : 0)
+        }
+        .frame(maxHeight: family == .systemLarge ? 60 : 56)
+    }
+}
+
+struct TimelineWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "Timeline", provider: TimelineWidgetProvider()) { entry in
+            TimelineWidgetView(entry: entry)
+        }
+        .configurationDisplayName("Timeline")
+        .description("Your next few things across today and tomorrow. Tap a circle to check it off.")
+        .supportedFamilies([.systemMedium, .systemLarge])
     }
 }
 

@@ -6,7 +6,8 @@ import ActivityKit
 /// Keeps widgets and the lock-screen countdown in step with the app's data.
 enum WidgetSync {
     @MainActor
-    static func update(planner: DayPlanner, food: [FoodEntry], water: [WaterEntry], plans: [MealPlan]) {
+    static func update(planner: DayPlanner, food: [FoodEntry], water: [WaterEntry], plans: [MealPlan],
+                       checks: [BlockCheck] = [], events: [CustomEvent] = []) {
         let cal = Calendar.current
         let now = Date()
         var snapshot = SharedStore.Snapshot()
@@ -26,6 +27,24 @@ enum WidgetSync {
         }
         snapshot.departures = departures
 
+        // The next few things on your timeline, across today and the next two days.
+        let done = Set(checks.map { $0.dayKey + "|" + $0.blockID })
+        var items: [SharedStore.Item] = []
+        for offset in 0..<3 {
+            guard let day = cal.date(byAdding: .day, value: offset, to: cal.startOfDay(for: now)) else { continue }
+            let key = DayKey.of(day)
+            let lunch = plans.first { $0.dayKey == key && $0.slot == .lunch }.map { "Planned: " + $0.title }
+            let dinner = plans.first { $0.dayKey == key && $0.slot == .dinner }.map { "Planned: " + $0.title }
+            for block in planner.blocks(for: day, lunchNote: lunch, dinnerNote: dinner, events: events)
+            where (block.end ?? block.start.addingTimeInterval(30 * 60)) > now {
+                items.append(SharedStore.Item(blockID: block.id, dayKey: key, title: block.title, subtitle: block.subtitle,
+                                              start: block.start, end: block.end, symbol: block.symbol,
+                                              category: categoryKey(block.category),
+                                              done: done.contains(key + "|" + block.id)))
+            }
+        }
+        snapshot.items = Array(items.prefix(16))
+
         let todaysFood = food.filter { cal.isDateInToday($0.date) }
         snapshot.calories = todaysFood.compactMap { $0.calories }.reduce(0, +)
         snapshot.protein = todaysFood.compactMap { $0.protein }.reduce(0, +)
@@ -39,6 +58,31 @@ enum WidgetSync {
 
         SharedStore.save(snapshot)
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private static func categoryKey(_ category: BlockCategory) -> String {
+        switch category {
+        case .commute: return "commute"
+        case .gym: return "gym"
+        case .food: return "food"
+        case .sleep: return "sleep"
+        case .work: return "work"
+        case .general: return "general"
+        }
+    }
+
+    /// Applies check-offs tapped on the timeline widget.
+    @MainActor
+    static func mergePendingChecks(into context: ModelContext, existing: [BlockCheck]) {
+        for itemID in SharedStore.takePendingChecks() {
+            let parts = itemID.split(separator: "|", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { continue }
+            if let check = existing.first(where: { $0.dayKey == parts[0] && $0.blockID == parts[1] }) {
+                context.delete(check)
+            } else {
+                context.insert(BlockCheck(dayKey: parts[0], blockID: parts[1]))
+            }
+        }
     }
 
     /// Adds water logged from the widget into the app's history.

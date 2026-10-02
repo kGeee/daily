@@ -21,6 +21,10 @@ Signing & Capabilities and pick your Team. They share data through the App Group
 (already set in `Config/*.entitlements`). If Xcode says the App Group or bundle IDs aren't available,
 change `com.kgeee` to something unique in all three targets and in `SharedStore.groupID` + the entitlements.
 
+## Sharing with TestFlight
+
+See [docs/TestFlight.md](docs/TestFlight.md).
+
 ## Tests
 
 Press **⌘U** in Xcode (with an iPhone simulator selected) to run the unit tests in `DailyTests/`:
@@ -68,6 +72,12 @@ Caltrain uses the train times you add in Settings; until then it shows estimates
 - **Widgets** — Next up (home + lock screen) and Water with +8 / +16 buttons.
 - **Lock Screen countdown** — Commute → "Show countdown on Lock Screen" (Live Activity + Dynamic Island).
 - **Share from Instagram** — Share → Daily on a reel; the importer opens next time you open the app.
+- **Commute routines** — Commute → gear: each kind of day (Shuttle, Gym, Caltrain, Mountain View) is a list of
+  steps you can edit (shuttle, VTA, Caltrain, gym, hanging out). Steps can follow the previous one or pick the
+  next departure from a timetable (Caltrain from Sunnyvale or Mountain View, the Sunnyvale station shuttle, or
+  your own). Tap any commute step on Today or Commute to change it just for that day.
+- **Timeline widget** — your next few things across days, with tap-to-check circles and a + button.
+- **Edit meals** — tap a logged meal on Food to change or delete it.
 
 ## Next up
 

@@ -69,22 +69,30 @@ struct ActiveWorkoutView: View {
         .padding(.top, 8)
     }
 
+    /// Your next way home today, from the gym-day routine.
+    private var nextDeparture: TimelineBlock? {
+        DayPlanner(pattern: pattern, overrides: overrides)
+            .blocks(for: session.date, lunchNote: nil, dinnerNote: nil)
+            .first { $0.isDeparture && $0.start > Date() && $0.category != .gym }
+    }
+
+    @ViewBuilder
     private var trainBanner: some View {
-        let pick = MySchedule.caltrainAfterGym
-        let train = pick.time.on(session.date)
-        let wrapUp = train.addingTimeInterval(-Double(MySchedule.gymToStationMinutes * 60))
-        return HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Caltrain home · " + (pick.isEstimate ? "~" : "") + train.formatted(date: .omitted, time: .shortened))
-                    .font(.subheadline.weight(.bold))
-                Text("Wrap up by " + wrapUp.formatted(date: .omitted, time: .shortened) + " to make it")
-                    .font(.caption)
-                    .opacity(0.75)
+        if let next = nextDeparture {
+            let leaveBy = next.leaveBy ?? next.start
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(next.title + " · " + (next.isEstimate ? "~" : "") + next.start.formatted(date: .omitted, time: .shortened))
+                        .font(.subheadline.weight(.bold))
+                    Text("Wrap up by " + leaveBy.formatted(date: .omitted, time: .shortened) + " to make it")
+                        .font(.caption)
+                        .opacity(0.75)
+                }
+                Spacer()
             }
-            Spacer()
+            .foregroundStyle(Palette.bg)
+            .card(padding: 14, fill: Palette.ink)
         }
-        .foregroundStyle(Palette.bg)
-        .card(padding: 14, fill: Palette.ink)
     }
 
     private var cardioCard: some View {

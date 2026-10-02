@@ -16,6 +16,8 @@ struct TodayView: View {
     @State private var showNewEvent = false
     @State private var showWeekPlan = false
     @State private var showReview = false
+    @State private var showSettings = false
+    @State private var stepEdit: StepDayEdit?
     @Query private var plans: [MealPlan]
     @AppStorage(Pref.revision) private var revision = 0
 
@@ -81,6 +83,12 @@ struct TodayView: View {
         .sheet(isPresented: $showReview) {
             WeekReviewView()
         }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+        }
+        .sheet(item: $stepEdit) { edit in
+            StepDayEditor(edit: edit)
+        }
         .sheet(isPresented: $showNewEvent) {
             EventEditor(event: nil, defaultDay: selectedDay)
         }
@@ -110,6 +118,16 @@ struct TodayView: View {
                     .background(Palette.card, in: Circle())
             }
             .accessibilityLabel("Plan the week")
+            Button {
+                showSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.headline)
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 36, height: 36)
+                    .background(Palette.card, in: Circle())
+            }
+            .accessibilityLabel("Settings")
             if let type = planner.type(for: selectedDay) {
                 Menu {
                     ForEach(DayType.allCases) { t in
@@ -385,6 +403,8 @@ struct TodayView: View {
                     .onTapGesture {
                         if let id = block.eventID {
                             editingEvent = events.first { $0.id == id }
+                        } else if block.routineType != nil {
+                            stepEdit = StepDayEdit(block: block, day: selectedDay)
                         }
                     }
                 }

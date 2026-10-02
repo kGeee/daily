@@ -31,7 +31,9 @@ struct RootView: View {
     @Query private var food: [FoodEntry]
     @Query private var water: [WaterEntry]
     @Query private var plans: [MealPlan]
+    @Query private var checks: [BlockCheck]
     @State private var pendingImport: SharedStore.PendingImport?
+    @State private var addingEvent = false
     @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
     @AppStorage("remindersOn") private var remindersOn = false
     @AppStorage(Pref.revision) private var revision = 0
@@ -49,7 +51,8 @@ struct RootView: View {
         let w = water.reduce(0) { $0 + $1.ounces }
         let f = food.count
         let c = food.compactMap { $0.calories }.reduce(0, +)
-        return "\(reminderKey)|\(w)|\(f)|\(c)|\(plans.count)"
+        let k = checks.count
+        return "\(reminderKey)|\(w)|\(f)|\(c)|\(plans.count)|\(k)"
     }
 
     var body: some View {
@@ -85,10 +88,15 @@ struct RootView: View {
         .sheet(item: $pendingImport) { item in
             ImportRecipeView(link: item.link, text: item.text, autoRun: true)
         }
+        .sheet(isPresented: $addingEvent) {
+            EventEditor(event: nil, defaultDay: Date())
+        }
     }
 
     private func appBecameActive() {
         WidgetSync.mergePendingWater(into: context)
+        WidgetSync.mergePendingChecks(into: context, existing: checks)
+        if SharedStore.takeAddEventRequest() { addingEvent = true }
         if pendingImport == nil, let next = SharedStore.takePendingImports().last {
             pendingImport = next
         }
@@ -98,7 +106,7 @@ struct RootView: View {
 
     private func refreshWidgets() {
         WidgetSync.update(planner: DayPlanner(pattern: pattern, overrides: overrides),
-                          food: food, water: water, plans: plans)
+                          food: food, water: water, plans: plans, checks: checks, events: events)
     }
 
     private func refreshReminders() async {

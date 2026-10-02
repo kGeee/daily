@@ -9,6 +9,8 @@ enum Backup {
         var intPrefs: [String: Int] = [:]
         var stringPrefs: [String: String] = [:]
         var boolPrefs: [String: Bool] = [:]
+        /// Routines, timetables and one-day changes (optional so older backups still load).
+        var dataPrefs: [String: Data]? = nil
         var food: [FoodDTO] = []
         var groceries: [GroceryDTO] = []
         var recipes: [RecipeDTO] = []
@@ -45,8 +47,14 @@ enum Backup {
                           Pref.caltrainLeaveWork, Pref.prepStart, Pref.prepEnd, Pref.reminderLead, Pref.waterGoal,
                           Pref.eatOutGoal, Pref.calorieGoal, Pref.proteinGoal]
     static let stringKeys = [Pref.shuttleStop, Pref.homeStation, Pref.morningTrains, Pref.eveningTrains,
-                             Pref.liveStationName, Pref.liveHomeStops, Pref.liveSunnyvaleStops, Pref.directionToWork,
-                             "weekPattern"]
+                             Pref.liveStationName, Pref.liveHomeStops, Pref.liveSunnyvaleStops, Pref.liveMountainViewStops,
+                             Pref.directionToWork, "weekPattern"]
+    static let dataKeys = ["pref.routines", "pref.timetableList", "pref.stepOverrides"]
+
+    /// Times for every timetable (the built-in Caltrain ones are already in stringKeys).
+    static var timetableKeys: [String] {
+        Timetables.all.map { Timetables.timesKey($0.id) }.filter { !stringKeys.contains($0) }
+    }
     static let boolKeys = ["remindersOn"]
 
     @MainActor
@@ -56,6 +64,10 @@ enum Backup {
         for key in intKeys { if let v = defaults.object(forKey: key) as? Int { file.intPrefs[key] = v } }
         for key in stringKeys { if let v = defaults.string(forKey: key) { file.stringPrefs[key] = v } }
         for key in boolKeys { if defaults.object(forKey: key) != nil { file.boolPrefs[key] = defaults.bool(forKey: key) } }
+        for key in timetableKeys { if let v = defaults.string(forKey: key) { file.stringPrefs[key] = v } }
+        var data: [String: Data] = [:]
+        for key in dataKeys { if let v = defaults.data(forKey: key) { data[key] = v } }
+        file.dataPrefs = data
 
         file.food = try context.fetch(FetchDescriptor<FoodEntry>()).map {
             FoodDTO(date: $0.date, slot: $0.slotRaw, name: $0.name, source: $0.sourceRaw,
@@ -123,6 +135,7 @@ enum Backup {
         for (k, v) in file.intPrefs { defaults.set(v, forKey: k) }
         for (k, v) in file.stringPrefs { defaults.set(v, forKey: k) }
         for (k, v) in file.boolPrefs { defaults.set(v, forKey: k) }
+        for (k, v) in file.dataPrefs ?? [:] { defaults.set(v, forKey: k) }
 
         for f in file.food {
             context.insert(FoodEntry(date: f.date, slot: MealSlot(rawValue: f.slot) ?? .snack, name: f.name,

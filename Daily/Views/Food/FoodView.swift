@@ -58,6 +58,8 @@ struct LogDraft: Identifiable {
     var slot: MealSlot
     var source: MealSource
     var name: String = ""
+    /// Set when editing something already logged.
+    var entry: FoodEntry? = nil
 }
 
 struct FoodTodaySection: View {
@@ -220,7 +222,14 @@ struct FoodTodaySection: View {
                                 Spacer(minLength: 4)
                                 sourceTag(entry.source)
                             }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                draft = LogDraft(slot: entry.slot, source: entry.source, name: entry.name, entry: entry)
+                            }
                             .contextMenu {
+                                Button("Edit") {
+                                    draft = LogDraft(slot: entry.slot, source: entry.source, name: entry.name, entry: entry)
+                                }
                                 Button("Delete", role: .destructive) { context.delete(entry) }
                             }
                         }
@@ -293,10 +302,22 @@ struct LogMealSheet: View {
     @State private var estimating = false
     @State private var estimateNote: String?
 
+    private let entry: FoodEntry?
+    @State private var time: Date
+    @State private var confirmDelete = false
+
     init(draft: LogDraft) {
+        entry = draft.entry
         _name = State(initialValue: draft.name)
         _slot = State(initialValue: draft.slot)
         _source = State(initialValue: draft.source)
+        _time = State(initialValue: draft.entry?.date ?? Date())
+        if let e = draft.entry {
+            _calories = State(initialValue: e.calories.map(String.init) ?? "")
+            _protein = State(initialValue: e.protein.map(String.init) ?? "")
+            _carbs = State(initialValue: e.carbs.map(String.init) ?? "")
+            _fat = State(initialValue: e.fat.map(String.init) ?? "")
+        }
     }
 
     private func use(_ recipe: Recipe) {
@@ -349,6 +370,9 @@ struct LogMealSheet: View {
                         ForEach(MealSource.allCases) { s in Text(s.title).tag(s) }
                     }
                     .pickerStyle(.segmented)
+                    if entry != nil {
+                        DatePicker("When", selection: $time)
+                    }
                 }
                 if source != .out && !recipes.isEmpty {
                     Section("From your recipes") {
@@ -390,8 +414,16 @@ struct LogMealSheet: View {
                 } footer: {
                     Text("Be specific for better estimates, e.g. \"Chipotle chicken bowl, white rice, black beans, guac\".")
                 }
+                if let entry {
+                    Section {
+                        Button("Delete this meal", role: .destructive) {
+                            context.delete(entry)
+                            dismiss()
+                        }
+                    }
+                }
             }
-            .navigationTitle("Log meal")
+            .navigationTitle(entry == nil ? "Log meal" : "Edit meal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -405,20 +437,28 @@ struct LogMealSheet: View {
         }
         .presentationDetents([.medium, .large])
         .onAppear {
-            if calories.isEmpty, let match = recipes.first(where: { $0.name == name }) {
+            if entry == nil, calories.isEmpty, let match = recipes.first(where: { $0.name == name }) {
                 use(match)
             }
         }
     }
 
     private func save() {
-        context.insert(FoodEntry(slot: slot,
-                                 name: name.trimmingCharacters(in: .whitespaces),
-                                 source: source,
-                                 calories: Int(calories),
-                                 protein: Int(protein),
-                                 carbs: Int(carbs),
-                                 fat: Int(fat)))
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        if let entry {
+            entry.name = trimmed
+            entry.slotRaw = slot.rawValue
+            entry.sourceRaw = source.rawValue
+            entry.date = time
+            entry.calories = Int(calories)
+            entry.protein = Int(protein)
+            entry.carbs = Int(carbs)
+            entry.fat = Int(fat)
+        } else {
+            context.insert(FoodEntry(slot: slot, name: trimmed, source: source,
+                                     calories: Int(calories), protein: Int(protein),
+                                     carbs: Int(carbs), fat: Int(fat)))
+        }
         dismiss()
     }
 }

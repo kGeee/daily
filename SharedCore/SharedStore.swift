@@ -18,6 +18,21 @@ enum SharedStore {
         var symbol: String
     }
 
+    /// One row on the timeline widget.
+    struct Item: Codable, Hashable, Identifiable {
+        var blockID: String
+        var dayKey: String
+        var title: String
+        var subtitle: String
+        var start: Date
+        var end: Date?
+        var symbol: String
+        /// commute, gym, food, sleep, work, general
+        var category: String
+        var done: Bool
+        var id: String { dayKey + "|" + blockID }
+    }
+
     struct Snapshot: Codable {
         var updated: Date = Date()
         var dayKey: String = ""
@@ -30,6 +45,7 @@ enum SharedStore {
         var protein: Int = 0
         var proteinGoal: Int = 140
         var meals: [String] = []
+        var items: [Item]? = nil
     }
 
     private static let snapshotKey = "widgetSnapshot"
@@ -114,5 +130,38 @@ enum SharedStore {
         let list = pendingImports()
         defaults.removeObject(forKey: pendingImportsKey)
         return list
+    }
+
+    // MARK: Check-offs tapped on the timeline widget (merged when the app opens)
+
+    private static let pendingChecksKey = "pendingChecks"
+
+    /// Tapping twice cancels out.
+    static func togglePendingCheck(_ itemID: String) {
+        var set = Set(defaults.stringArray(forKey: pendingChecksKey) ?? [])
+        if set.contains(itemID) { set.remove(itemID) } else { set.insert(itemID) }
+        defaults.set(Array(set), forKey: pendingChecksKey)
+    }
+
+    static func pendingChecks() -> Set<String> {
+        Set(defaults.stringArray(forKey: pendingChecksKey) ?? [])
+    }
+
+    static func takePendingChecks() -> Set<String> {
+        let set = pendingChecks()
+        defaults.removeObject(forKey: pendingChecksKey)
+        return set
+    }
+
+    // MARK: "+" on the widget asks the app to open the new-event screen
+
+    private static let openAddEventKey = "openAddEvent"
+
+    static func requestAddEvent() { defaults.set(true, forKey: openAddEventKey) }
+
+    static func takeAddEventRequest() -> Bool {
+        let value = defaults.bool(forKey: openAddEventKey)
+        defaults.removeObject(forKey: openAddEventKey)
+        return value
     }
 }

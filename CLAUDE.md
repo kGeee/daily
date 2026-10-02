@@ -9,3 +9,5 @@
 - App, widgets and share extension talk through the App Group `group.com.kgeee.daily` (`SharedStore`). The app pushes a snapshot for widgets via `WidgetSync`.
 - AI calls go through `AIClient` (Anthropic API, user's key in Keychain). Live trains use 511.org (`Caltrain511`).
 - Unit tests live in `DailyTests/` (target `DailyTests`, host app `Daily`, shared scheme `Daily`). Add a test with any logic change; keep logic out of views where possible so it can be tested.
+- Commute timelines come from `Routines` (`Daily/Schedule/Routines.swift`): per-DayType lists of `RoutineStep`, resolved by `RoutineResolver` with `Timetables` and one-day `StepOverride`s. Default routines are built from the old `Pref` values. Built-in step ids ("out", "work", "go", "gym", "home") are relied on by check-offs and tests.
+- Signing team is `7CK43PG7GZ` (set in the project generator for every target).

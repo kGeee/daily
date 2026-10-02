@@ -54,6 +54,7 @@ enum Palette {
     static let waterText = Color(light: 0x0F5E75, dark: 0xA8E0EE)
 
     static let general = Color(light: 0xB83A6E, dark: 0xF07AA8)
+    static let generalTint = Color(light: 0xF9E6EE, dark: 0x3A1C29)
 
     static let work = Color(light: 0x6B717D, dark: 0x9AA0AB)
     static let caltrain = Color(light: 0x6B717D, dark: 0xB9BEC8)

@@ -5,9 +5,10 @@ struct CommuteView: View {
     @Environment(\.modelContext) private var context
     @Query private var overrides: [DayTypeOverride]
     @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
-    @AppStorage("remindersOn") private var remindersOn = false
     @AppStorage(Pref.revision) private var revision = 0
     @State private var showSettings = false
+    @State private var editingRoutine: DayType?
+    @State private var stepEdit: StepDayEdit?
 
     private var planner: DayPlanner { DayPlanner(pattern: pattern, overrides: overrides) }
 
@@ -30,21 +31,35 @@ struct CommuteView: View {
                         .pickerStyle(.segmented)
                     }
                     nextCard(now: tl.date)
-                    LiveTrainsCard()
+                    LiveTrainsCard(planner: planner)
                     if let type = planner.type(for: today) {
                         dayPlanCard(type: type, day: today, now: tl.date)
+                    } else {
+                        Text("No commute today. Enjoy the weekend.")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Palette.muted)
+                            .card()
                     }
-                    trainsCard(now: tl.date)
-                    remindersCard
-                    thisWeekCard(today: today)
-                    usualWeekCard
                 }
                 .padding(16)
             }
             .background(Palette.bg.ignoresSafeArea())
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView()
+            CommuteSettingsView()
+        }
+        .sheet(item: $stepEdit) { edit in
+            StepDayEditor(edit: edit)
+        }
+        .sheet(item: $editingRoutine) { type in
+            NavigationStack {
+                RoutineEditorView(type: type)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { editingRoutine = nil }
+                        }
+                    }
+            }
         }
     }
 
@@ -61,7 +76,7 @@ struct CommuteView: View {
                     .foregroundStyle(Palette.muted)
                     .frame(width: 44, height: 44)
             }
-            .accessibilityLabel("Schedule settings")
+            .accessibilityLabel("Commute settings")
         }
     }
 
@@ -120,7 +135,7 @@ struct CommuteView: View {
                     }
                 }
                 if block.isEstimate {
-                    Text("Estimated. Add your Caltrain times in Settings for exact trains.")
+                    Text("Estimated. Add times to this timetable in Commute settings for exact departures.")
                         .font(.caption)
                         .opacity(0.85)
                 }
@@ -160,212 +175,88 @@ struct CommuteView: View {
 
     private func dayPlanCard(type: DayType, day: Date, now: Date) -> some View {
         let legs = planner.blocks(for: day, lunchNote: nil, dinnerNote: nil)
-            .filter { $0.isDeparture || $0.id == "gym" }
-
-        return VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Today · " + type.title)
-            ForEach(legs) { leg in
-                let past = (leg.end ?? leg.start) < now
-                HStack(spacing: 12) {
-                    Image(systemName: leg.symbol)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(leg.category.color)
-                        .frame(width: 32, height: 32)
-                        .background(Palette.circle, in: Circle())
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(leg.title)
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(past ? Palette.faint : Palette.ink)
-                        if !leg.subtitle.isEmpty {
-                            Text(leg.subtitle)
-                                .font(.caption)
-                                .foregroundStyle(Palette.muted)
-                        }
-                    }
-                    Spacer()
-                    Text((leg.isEstimate ? "~" : "") + leg.start.formatted(date: .omitted, time: .shortened))
-                        .font(.subheadline.weight(.heavy).monospacedDigit())
-                        .foregroundStyle(past ? Palette.faint : Palette.ink)
-                }
-            }
-        }
-        .card()
-    }
-
-    // MARK: Trains
-
-    private func trainsCard(now: Date) -> some View {
-        let morning = MySchedule.morningTrains
-        let evening = MySchedule.eveningTrains
-        let nowMinutes = Calendar.current.component(.hour, from: now) * 60 + Calendar.current.component(.minute, from: now)
+            .filter { $0.routineType != nil }
+        let changed = Routines.overrides(for: DayKey.of(day))
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                SectionLabel(text: "Your Caltrain times")
+                SectionLabel(text: "Today · " + type.title)
                 Spacer()
-                Button("Edit") { showSettings = true }
+                Button("Edit routine") { editingRoutine = type }
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Palette.commuteText)
             }
-            if morning.isEmpty && evening.isEmpty {
-                Text("Add the trains you usually take in Settings. Gym and Caltrain days will then use the real train instead of an estimate.")
-                    .font(.footnote)
-                    .foregroundStyle(Palette.muted)
-            } else {
-                trainRow(label: MySchedule.homeStation + " → Sunnyvale", trains: morning, nowMinutes: nowMinutes)
-                trainRow(label: "Sunnyvale → " + MySchedule.homeStation, trains: evening, nowMinutes: nowMinutes)
-            }
-        }
-        .card()
-    }
-
-    private func trainRow(label: String, trains: [Int], nowMinutes: Int) -> some View {
-        let next = trains.first { $0 >= nowMinutes }
-        return VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Palette.muted)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    if trains.isEmpty {
-                        Text("None added")
-                            .font(.caption)
-                            .foregroundStyle(Palette.faint)
-                    }
-                    ForEach(trains, id: \.self) { minutes in
-                        let isNext = minutes == next
-                        let isPast = minutes < nowMinutes
-                        Text(ClockTime(minutes: minutes).label)
-                            .font(.caption.weight(.bold).monospacedDigit())
-                            .foregroundStyle(isNext ? Palette.onAccent : (isPast ? Palette.faint : Palette.ink))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(isNext ? Palette.commute : Palette.card2, in: Capsule())
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: Reminders
-
-    private var remindersCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle(isOn: Binding(
-                get: { remindersOn },
-                set: { newValue in
-                    if newValue {
-                        Task { remindersOn = await Reminders.requestPermission() }
-                    } else {
-                        remindersOn = false
-                    }
-                }
-            )) {
-                Text("Remind me \(MySchedule.reminderLeadMinutes) min before I need to leave")
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Palette.ink)
-            }
-            .tint(Palette.commute)
-            Text("Also reminds you about Sunday meal prep, wind-down, packing your gym bag, and your own events.")
-                .font(.caption)
-                .foregroundStyle(Palette.muted)
-        }
-        .card()
-    }
-
-    // MARK: Weeks
-
-    private func thisWeekCard(today: Date) -> some View {
-        let cal = Calendar.current
-        let start = cal.dateInterval(of: .weekOfYear, for: today)?.start ?? today
-        let weekdays: [Date] = (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: start) }
-            .filter { (2...6).contains(cal.component(.weekday, from: $0)) }
-
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                SectionLabel(text: "This week")
-                Spacer()
-                Text("Tap a day to change it")
-                    .font(.caption)
-                    .foregroundStyle(Palette.muted)
-            }
-            HStack(spacing: 6) {
-                ForEach(weekdays, id: \.self) { day in
-                    let type = planner.type(for: day) ?? .shuttle
-                    let isToday = cal.isDateInToday(day)
-                    let isPast = day < today
-                    Menu {
-                        ForEach(DayType.allCases) { t in
-                            Button(t.title) { setType(t, on: day) }
-                        }
-                    } label: {
-                        VStack(spacing: 2) {
-                            Text(day.formatted(.dateTime.weekday(.abbreviated)).uppercased())
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(Palette.muted)
-                            Text(type.short)
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(isPast ? Palette.faint : Palette.ink)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(type.tint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(isToday ? Palette.ink : Color.clear, lineWidth: 2)
-                        )
-                    }
-                }
-            }
-        }
-        .card()
-    }
-
-    private var usualWeekCard: some View {
-        let days: [(String, Int)] = [("MON", 2), ("TUE", 3), ("WED", 4), ("THU", 5), ("FRI", 6)]
-
-        return VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Your usual week")
-            Text("The default for every week. Changes above only affect that one day.")
-                .font(.caption)
-                .foregroundStyle(Palette.muted)
-            HStack(spacing: 6) {
-                ForEach(days, id: \.1) { day in
-                    let name = day.0
-                    let weekday = day.1
-                    let type = planner.usualType(forWeekday: weekday) ?? .shuttle
-                    Menu {
-                        ForEach(DayType.allCases) { t in
-                            Button(t.title) {
-                                pattern = DayPlanner.updating(pattern: pattern, weekday: weekday, to: t)
+            ForEach(legs) { leg in
+                let past = (leg.end ?? leg.start) < now
+                Button {
+                    stepEdit = StepDayEdit(block: leg, day: day)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: leg.symbol)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(leg.category.color)
+                            .frame(width: 32, height: 32)
+                            .background(Palette.circle, in: Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(leg.title)
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(past ? Palette.faint : Palette.ink)
+                            if !leg.subtitle.isEmpty {
+                                Text(leg.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(Palette.muted)
+                                    .multilineTextAlignment(.leading)
                             }
                         }
-                    } label: {
-                        VStack(spacing: 2) {
-                            Text(name).font(.caption2.weight(.bold)).foregroundStyle(Palette.muted)
-                            Text(type.short).font(.caption.weight(.bold)).foregroundStyle(Palette.ink)
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text((leg.isEstimate ? "~" : "") + leg.start.formatted(date: .omitted, time: .shortened))
+                                .font(.subheadline.weight(.heavy).monospacedDigit())
+                                .foregroundStyle(past ? Palette.faint : Palette.ink)
+                            if changed[leg.id] != nil {
+                                Text("changed")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(Palette.gymText)
+                            }
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Palette.card2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(type.color, lineWidth: 1.5)
-                        )
                     }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
+            ForEach(skippedSteps(type: type, day: day)) { step in
+                Button {
+                    Routines.setOverride(nil, step: step.id, dayKey: DayKey.of(day))
+                    Pref.bump()
+                } label: {
+                    Label("Skipped: \(step.title) · bring it back", systemImage: "arrow.uturn.backward")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Palette.commuteText)
+                }
+                .buttonStyle(.plain)
+            }
+            Text("Tap a step to change it just for today.")
+                .font(.caption)
+                .foregroundStyle(Palette.faint)
         }
         .card()
+    }
+
+    private func skippedSteps(type: DayType, day: Date) -> [RoutineStep] {
+        let changed = Routines.overrides(for: DayKey.of(day))
+        return Routines.steps(for: type).filter { changed[$0.id]?.skipped == true }
     }
 }
 
-/// Live departures from 511.org: your station toward Sunnyvale before noon,
-/// Sunnyvale toward home after.
+/// Live departures from 511.org for your next Caltrain step today: your station toward
+/// Sunnyvale in the morning, or Sunnyvale / Mountain View toward home later.
 struct LiveTrainsCard: View {
+    let planner: DayPlanner
+
     @AppStorage(Pref.liveStationName) private var stationName = ""
     @AppStorage(Pref.liveHomeStops) private var homeStops = ""
     @AppStorage(Pref.liveSunnyvaleStops) private var sunnyvaleStops = ""
+    @AppStorage(Pref.liveMountainViewStops) private var mountainViewStops = ""
     @AppStorage(Pref.directionToWork) private var directionToWork = Pref.directionToWorkDefault
 
     @State private var departures: [Caltrain511.Departure] = []
@@ -373,15 +264,42 @@ struct LiveTrainsCard: View {
     @State private var loading = false
     @State private var updated: Date?
 
-    private var isMorning: Bool { Calendar.current.component(.hour, from: Date()) < 12 }
+    /// Which live line to show: from today's routine if it has a Caltrain step coming up.
+    private var line: Timetable.Live {
+        let now = Date()
+        let nowMinutes = Calendar.current.component(.hour, from: now) * 60 + Calendar.current.component(.minute, from: now)
+        if let type = planner.type(for: now) {
+            let resolved = RoutineResolver.resolve(Routines.steps(for: type),
+                                                   overrides: Routines.overrides(for: DayKey.of(now)))
+            for r in resolved where r.start >= nowMinutes - 5 {
+                if let id = r.step.timetableID, let live = Timetables.get(id)?.live, live != .none {
+                    return live
+                }
+            }
+        }
+        return nowMinutes < 12 * 60 ? .homeToWork : .sunnyvaleToHome
+    }
+
     private var stops: [String] {
-        (isMorning ? homeStops : sunnyvaleStops).split(separator: ",").map(String.init)
+        let raw: String
+        switch line {
+        case .homeToWork, .none: raw = homeStops
+        case .sunnyvaleToHome: raw = sunnyvaleStops
+        case .mountainViewToHome: raw = mountainViewStops
+        }
+        return raw.split(separator: ",").map(String.init)
     }
+
     private var direction: String {
-        isMorning ? directionToWork : (directionToWork == "S" ? "N" : "S")
+        line == .homeToWork ? directionToWork : (directionToWork == "S" ? "N" : "S")
     }
+
     private var routeLabel: String {
-        isMorning ? "\(stationName) → Sunnyvale" : "Sunnyvale → \(stationName)"
+        switch line {
+        case .homeToWork, .none: return "\(stationName) → Sunnyvale"
+        case .sunnyvaleToHome: return "Sunnyvale → \(stationName)"
+        case .mountainViewToHome: return "Mountain View → \(stationName)"
+        }
     }
 
     var body: some View {
@@ -436,7 +354,7 @@ struct LiveTrainsCard: View {
                 }
             }
             .card()
-            .task { await load() }
+            .task(id: line) { await load() }
         }
     }
 

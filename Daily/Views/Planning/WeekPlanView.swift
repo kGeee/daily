@@ -220,21 +220,17 @@ struct WeekPlanView: View {
     // MARK: Day card
 
     private func commuteLine(for day: Date, type: DayType?, gymName: String?) -> String {
-        switch type {
-        case .shuttle?:
-            return "Shuttle \(MySchedule.shuttleOut.label) · home \(MySchedule.shuttleHome.label)"
-        case .gym?:
-            let train = MySchedule.caltrainAfterGym
-            return "Shuttle \(MySchedule.shuttleOut.label) · \(gymName ?? "Gym") \(MySchedule.gymStart.label) · train \(train.isEstimate ? "~" : "")\(train.time.label)"
-        case .caltrain?:
-            let out = MySchedule.caltrainOut
-            let home = MySchedule.caltrainAfterWork
-            return "Train \(out.isEstimate ? "~" : "")\(out.time.label) · home \(home.isEstimate ? "~" : "")\(home.time.label)"
-        case nil:
+        guard type != nil else {
             return cal.component(.weekday, from: day) == 1
                 ? "Meal prep \(MySchedule.prepStart.label) – \(MySchedule.prepEnd.label)"
                 : "Free day"
         }
+        let steps = planner.blocks(for: day, lunchNote: nil, dinnerNote: nil)
+            .filter { $0.routineType != nil && ($0.isDeparture || $0.category == .gym) }
+        return steps.map { block in
+            let name = block.category == .gym ? (gymName ?? block.title) : block.title
+            return name + " " + (block.isEstimate ? "~" : "") + block.start.formatted(date: .omitted, time: .shortened)
+        }.joined(separator: " · ")
     }
 
     private func dayCard(_ day: Date, gymName: String?) -> some View {
