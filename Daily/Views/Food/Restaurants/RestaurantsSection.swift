@@ -257,7 +257,7 @@ struct RestaurantsSection: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            if let rating = r.yelpRating, rating > 0 {
+            if let rating = r.yelpRating ?? r.googleRating, rating > 0 {
                 Label(String(format: "%.1f", rating), systemImage: "star.fill")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(Palette.gymText)

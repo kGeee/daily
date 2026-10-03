@@ -16,6 +16,9 @@ struct TodayView: View {
     @State private var showNewEvent = false
     @State private var showWeekPlan = false
     @State private var showMonth = false
+    @State private var showJournal = false
+    @State private var checkInPhoto: JournalView.PhotoDraft?
+    @Query(sort: \JournalEntry.date, order: .reverse) private var journal: [JournalEntry]
     @State private var showReview = false
     @State private var showSettings = false
     @State private var stepEdit: StepDayEdit?
@@ -38,6 +41,9 @@ struct TodayView: View {
                                 now: tl.date) { item in
                             markDone(item)
                         }
+                        CheckInCard(entries: journal, meals: food, now: tl.date,
+                                    onOpenJournal: { showJournal = true },
+                                    onPhoto: { data in checkInPhoto = JournalView.PhotoDraft(data: data) })
                     }
                     statsRow
                     goalsRow
@@ -88,6 +94,12 @@ struct TodayView: View {
         .sheet(isPresented: $showWeekPlan) {
             WeekPlanView()
         }
+        .sheet(isPresented: $showJournal) {
+            JournalView()
+        }
+        .sheet(item: $checkInPhoto) { draft in
+            CheckInSheet(photo: draft.data)
+        }
         .sheet(isPresented: $showMonth) {
             MonthView { day in selectedDay = day }
         }
@@ -119,6 +131,16 @@ struct TodayView: View {
                     .foregroundStyle(Palette.ink)
             }
             Spacer()
+            Button {
+                showJournal = true
+            } label: {
+                Image(systemName: "book.pages")
+                    .font(.headline)
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 36, height: 36)
+                    .background(Palette.card, in: Circle())
+            }
+            .accessibilityLabel("Journal")
             Button {
                 showMonth = true
             } label: {

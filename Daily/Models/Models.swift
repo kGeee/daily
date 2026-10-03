@@ -32,6 +32,8 @@ final class FoodEntry {
     var fat: Int? = nil
     /// Set for meals eaten out at a saved restaurant (these are its visits).
     var restaurantID: UUID? = nil
+    /// A photo of the meal (JPEG, kept outside the database file).
+    @Attribute(.externalStorage) var photo: Data? = nil
 
     init(date: Date = .now, slot: MealSlot, name: String, source: MealSource,
          calories: Int? = nil, protein: Int? = nil, carbs: Int? = nil, fat: Int? = nil) {

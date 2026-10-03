@@ -18,6 +18,7 @@ struct RestaurantSearchSheet: View {
     @State private var loading = false
     @State private var message: String?
     @FocusState private var focused: Bool
+    @AppStorage(MapsApp.searchKey) private var provider = MapsApp.apple.rawValue
 
     var body: some View {
         NavigationStack {
@@ -35,13 +36,20 @@ struct RestaurantSearchSheet: View {
                 .background(Palette.card, in: Capsule())
                 .padding(.horizontal, 16)
 
+                if PlaceSearch.hasGoogleKey {
+                    PillSegment(MapsApp.allCases.map(\.rawValue), selection: $provider) {
+                        $0 == MapsApp.google.rawValue ? "Google" : "Apple Maps"
+                    }
+                    .padding(.horizontal, 16)
+                }
+
                 ScrollView {
                     VStack(alignment: .leading, spacing: 14) {
                         if !yelpResults.isEmpty {
                             group("Yelp", yelpResults)
                         }
                         if !results.isEmpty {
-                            group(yelpResults.isEmpty ? "Places" : "Apple Maps", results)
+                            group(PlaceSearch.searchesGoogle ? "Google" : (yelpResults.isEmpty ? "Places" : "Apple Maps"), results)
                         }
                         if let message {
                             Text(message).font(.footnote).foregroundStyle(Palette.muted)
@@ -73,7 +81,7 @@ struct RestaurantSearchSheet: View {
                 }
             }
             .onAppear { focused = true }
-            .task(id: query) {
+            .task(id: query + "|" + provider) {
                 try? await Task.sleep(for: .milliseconds(350))
                 guard !Task.isCancelled else { return }
                 await search()
@@ -106,12 +114,12 @@ struct RestaurantSearchSheet: View {
                                     .lineLimit(1)
                             }
                             Spacer(minLength: 6)
-                            if let yelp = place.yelp {
+                            if let rating = place.yelp?.rating ?? place.google?.rating, rating > 0 {
                                 VStack(alignment: .trailing, spacing: 0) {
-                                    Label(String(format: "%.1f", yelp.rating), systemImage: "star.fill")
+                                    Label(String(format: "%.1f", rating), systemImage: "star.fill")
                                         .font(.caption.weight(.bold))
                                         .foregroundStyle(Palette.gymText)
-                                    Text("\(yelp.reviews)")
+                                    Text("\(place.yelp?.reviews ?? place.google?.reviews ?? 0)")
                                         .font(.caption2)
                                         .foregroundStyle(Palette.faint)
                                 }
@@ -147,7 +155,16 @@ struct RestaurantSearchSheet: View {
         loading = true
         message = nil
         let region = PlaceSearch.searchRegion(near: restaurants)
-        results = (try? await PlaceSearch.appleMaps(q, region: region)) ?? []
+        if PlaceSearch.searchesGoogle {
+            do {
+                results = try await PlaceSearch.google(q, region: region)
+            } catch {
+                message = error.localizedDescription
+                results = (try? await PlaceSearch.appleMaps(q, region: region)) ?? []
+            }
+        } else {
+            results = (try? await PlaceSearch.appleMaps(q, region: region)) ?? []
+        }
         guard !Task.isCancelled else { return }
         if PlaceSearch.hasYelpKey {
             do {
@@ -474,6 +491,11 @@ struct RestaurantDetailSheet: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Palette.gymText)
                 }
+                if let rating = restaurant.googleRating, rating > 0 {
+                    Label("\(String(format: "%.1f", rating)) on Google · \(restaurant.googleReviews ?? 0) reviews", systemImage: "star.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Palette.gymText)
+                }
                 Button(feeling == nil ? (restaurant.wantToTry ? "I've been – rank it" : "Rank it") : "Rank again") {
                     if feeling != nil { RestaurantRanking.remove(restaurant, among: restaurants) }
                     ranking = restaurant
@@ -494,7 +516,8 @@ struct RestaurantDetailSheet: View {
                 Button {
                     openInMaps()
                 } label: {
-                    DetailRowLabel(symbol: "mappin.and.ellipse", tint: Palette.food, title: restaurant.address)
+                    DetailRowLabel(symbol: "mappin.and.ellipse", tint: Palette.food, title: restaurant.address,
+                                   value: MapsApp.current == .google ? "Google Maps" : "Maps")
                 }
                 .buttonStyle(.plain)
                 DetailDivider()
@@ -557,6 +580,33 @@ struct RestaurantDetailSheet: View {
                     .font(.subheadline)
                     .foregroundStyle(Palette.muted)
             }
+            let photos = visits.filter { $0.photo != nil }
+            if !photos.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(photos.prefix(12)) { visit in
+                            Button {
+                                draft = LogDraft(slot: visit.slot, source: visit.source, name: visit.name, entry: visit,
+                                                 restaurantID: restaurant.id)
+                            } label: {
+                                PhotoThumbnail(data: visit.photo!, maxPixel: 300)
+                                    .frame(width: 88, height: 88)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(alignment: .bottomLeading) {
+                                        Text(visit.date.formatted(.dateTime.month(.abbreviated).day()))
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(Palette.onAccent)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 2)
+                                            .background(Palette.ink.opacity(0.55), in: Capsule())
+                                            .padding(5)
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
             ForEach(visits.prefix(12)) { visit in
                 Button {
                     draft = LogDraft(slot: visit.slot, source: visit.source, name: visit.name, entry: visit,
@@ -589,12 +639,9 @@ struct RestaurantDetailSheet: View {
     }
 
     private func openInMaps() {
-        if let lat = restaurant.latitude, let lng = restaurant.longitude {
-            let item = MKMapItem(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lng)))
-            item.name = restaurant.name
-            item.openInMaps()
-        } else if let q = (restaurant.name + " " + restaurant.address).addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                  let url = URL(string: "maps://?q=" + q) {
+        if let url = MapsApp.url(for: MapsApp.current, name: restaurant.name, address: restaurant.address,
+                                 latitude: restaurant.latitude, longitude: restaurant.longitude,
+                                 googlePlaceID: restaurant.googlePlaceID) {
             openURL(url)
         }
     }

@@ -88,6 +88,8 @@ struct SettingsView: View {
     @AppStorage(Pref.calorieGoal) private var calorieGoal = Pref.calorieGoalDefault
     @AppStorage(Pref.proteinGoal) private var proteinGoal = Pref.proteinGoalDefault
     @State private var exportURL: URL?
+    @AppStorage(CheckIn.onKey) private var checkInOn = false
+    @AppStorage(CheckIn.timeKey) private var checkInTime = CheckIn.defaultTime
     @State private var showSetup = false
     @State private var backupMessage: String?
     @State private var importing = false
@@ -109,6 +111,9 @@ struct SettingsView: View {
     @AppStorage(Pref.revision) private var revision = 0
     @State private var apiKey = Keychain.read() ?? ""
     @State private var yelpKey = Keychain.read(PlaceSearch.yelpAccount) ?? ""
+    @State private var googleKey = Keychain.read(PlaceSearch.googleAccount) ?? ""
+    @AppStorage(MapsApp.prefKey) private var mapsApp = MapsApp.apple.rawValue
+    @AppStorage(MapsApp.searchKey) private var placeSearch = MapsApp.apple.rawValue
 
     var body: some View {
         NavigationStack {
@@ -135,6 +140,31 @@ struct SettingsView: View {
                     }
                 } footer: {
                     Text("Your routines for each kind of day, timetables, live Caltrain and departure reminders.")
+                }
+
+                Section {
+                    Toggle("Midday check-in reminder", isOn: Binding(
+                        get: { checkInOn },
+                        set: { on in
+                            if on {
+                                Task {
+                                    checkInOn = await Reminders.requestPermission()
+                                    await CheckIn.updateReminder()
+                                }
+                            } else {
+                                checkInOn = false
+                                Task { await CheckIn.updateReminder() }
+                            }
+                        }
+                    ))
+                    if checkInOn {
+                        TimeField(title: "Remind me at", minutes: $checkInTime)
+                            .onChange(of: checkInTime) { _, _ in Task { await CheckIn.updateReminder() } }
+                    }
+                } header: {
+                    Text("Photo journal")
+                } footer: {
+                    Text("A daily nudge to snap a photo of how the day is going. The check-in card also shows on Today around then.")
                 }
 
                 Section("Sunday meal prep") {
@@ -190,6 +220,19 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Picker("Open places in", selection: $mapsApp) {
+                        ForEach(MapsApp.allCases) { app in Text(app.title).tag(app.rawValue) }
+                    }
+                    Picker("Search with", selection: $placeSearch) {
+                        Text("Apple Maps").tag(MapsApp.apple.rawValue)
+                        Text("Google").tag(MapsApp.google.rawValue)
+                    }
+                    SecureField("Google Places API key", text: $googleKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: googleKey) { _, newValue in
+                            Keychain.save(newValue, account: PlaceSearch.googleAccount)
+                        }
                     SecureField("Yelp API key", text: $yelpKey)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -199,10 +242,13 @@ struct SettingsView: View {
                     if let url = URL(string: "https://www.yelp.com/developers/v3/manage_app") {
                         Link("Get a Yelp key", destination: url)
                     }
+                    if let url = URL(string: "https://developers.google.com/maps/documentation/places/web-service/get-api-key") {
+                        Link("Get a Google Places key", destination: url)
+                    }
                 } header: {
-                    Text("Restaurant ratings (optional)")
+                    Text("Maps & restaurant ratings")
                 } footer: {
-                    Text("Restaurant search uses Apple Maps and works without this. With a Yelp key you also see Yelp star ratings, review counts and prices. Yelp charges for its API after a trial, so this is entirely optional.")
+                    Text("Addresses open in the maps app you pick (Google Maps opens in its app if installed, otherwise the web). Search uses Apple Maps for free. Google search adds Google star ratings and needs a Places API (New) key; Google bills searches beyond its free monthly allowance. A Yelp key adds Yelp stars and review counts; Yelp's API is paid after a trial.")
                 }
 
                 Section {

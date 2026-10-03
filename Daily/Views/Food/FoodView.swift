@@ -427,6 +427,7 @@ struct LogMealSheet: View {
     /// The recipe picked below (by name) and how much of it you had, in its units.
     @State private var chosenRecipe: String?
     @State private var amount: Double = 1
+    @State private var photo: Data?
 
     @State private var name = ""
     @State private var slot: MealSlot
@@ -450,6 +451,7 @@ struct LogMealSheet: View {
         _source = State(initialValue: draft.source)
         _time = State(initialValue: draft.entry?.date ?? Date())
         _restaurantID = State(initialValue: draft.entry?.restaurantID ?? draft.restaurantID)
+        _photo = State(initialValue: draft.entry?.photo)
         if let e = draft.entry {
             _calories = State(initialValue: e.calories.map(String.init) ?? "")
             _protein = State(initialValue: e.protein.map(String.init) ?? "")
@@ -627,6 +629,8 @@ struct LogMealSheet: View {
 
             nutritionCard
 
+            photoCard
+
             if let entry {
                 DetailDeleteButton(title: "Delete this meal") {
                     context.delete(entry)
@@ -719,14 +723,54 @@ struct LogMealSheet: View {
             entry.carbs = Int(carbs)
             entry.fat = Int(fat)
             entry.restaurantID = source == .out ? restaurantID : nil
+            entry.photo = photo
         } else {
             let new = FoodEntry(date: time, slot: slot, name: trimmed, source: source,
                                 calories: Int(calories), protein: Int(protein),
                                 carbs: Int(carbs), fat: Int(fat))
             new.restaurantID = source == .out ? restaurantID : nil
+            new.photo = photo
             context.insert(new)
         }
         dismiss()
+    }
+
+    // MARK: Photo
+
+    private var photoCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Photo")
+            if let photo {
+                PhotoThumbnail(data: photo, maxPixel: 1000)
+                    .frame(height: 200)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(alignment: .topTrailing) {
+                        Button {
+                            withAnimation { self.photo = nil }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Palette.ink)
+                                .frame(width: 30, height: 30)
+                                .background(Palette.card.opacity(0.92), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(8)
+                        .accessibilityLabel("Remove photo")
+                    }
+            } else {
+                PhotoSourceButtons(tint: Palette.food, compact: true) { data in
+                    withAnimation(.snappy) { photo = data }
+                }
+                Text("Shows up in your journal" + (source == .out ? " and on the restaurant's page." : "."))
+                    .font(.footnote)
+                    .foregroundStyle(Palette.muted)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     // MARK: Where you ate

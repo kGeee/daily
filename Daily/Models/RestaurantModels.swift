@@ -56,6 +56,10 @@ final class Restaurant {
     var yelpRating: Double?
     var yelpReviews: Int?
     var yelpURL: String
+    var googlePlaceID: String = ""
+    var googleRating: Double? = nil
+    var googleReviews: Int? = nil
+    var googleURL: String = ""
     /// "" until you've rated it.
     var feelingRaw: String
     /// 0 = your favorite within its feeling group.
@@ -111,6 +115,12 @@ final class Restaurant {
             yelpRating = yelp.rating
             yelpReviews = yelp.reviews
             yelpURL = yelp.url
+        }
+        if let google = place.google {
+            googlePlaceID = google.id
+            googleRating = google.rating
+            googleReviews = google.reviews
+            googleURL = google.url
         }
     }
 }

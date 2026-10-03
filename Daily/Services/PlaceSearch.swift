@@ -10,6 +10,13 @@ struct PlaceResult: Identifiable, Hashable {
         var url: String
     }
 
+    struct Google: Hashable {
+        var id: String
+        var rating: Double
+        var reviews: Int
+        var url: String
+    }
+
     var id = UUID()
     var name: String
     var address: String = ""
@@ -20,14 +27,59 @@ struct PlaceResult: Identifiable, Hashable {
     var phone: String = ""
     var website: String = ""
     var yelp: Yelp? = nil
+    var google: Google? = nil
+}
+
+/// Which app opens places, and which service search uses.
+enum MapsApp: String, CaseIterable, Identifiable {
+    case apple, google
+    var id: String { rawValue }
+    var title: String { self == .apple ? "Apple Maps" : "Google Maps" }
+
+    static let prefKey = "pref.mapsApp"
+    static let searchKey = "pref.placeSearch"
+
+    static var current: MapsApp { MapsApp(rawValue: UserDefaults.standard.string(forKey: prefKey) ?? "") ?? .apple }
+
+    /// A link that opens the place: Google Maps (app if installed, else the web) or Apple Maps.
+    static func url(for app: MapsApp, name: String, address: String, latitude: Double?, longitude: Double?,
+                    googlePlaceID: String = "") -> URL? {
+        var components: URLComponents
+        switch app {
+        case .google:
+            components = URLComponents(string: "https://www.google.com/maps/search/")!
+            var query = [name, address].filter { !$0.isEmpty }.joined(separator: ", ")
+            if query.isEmpty, let latitude, let longitude { query = "\(latitude),\(longitude)" }
+            var items = [URLQueryItem(name: "api", value: "1"), URLQueryItem(name: "query", value: query)]
+            if !googlePlaceID.isEmpty { items.append(URLQueryItem(name: "query_place_id", value: googlePlaceID)) }
+            components.queryItems = items
+        case .apple:
+            components = URLComponents(string: "https://maps.apple.com/")!
+            var items = [URLQueryItem(name: "q", value: name.isEmpty ? address : name)]
+            if let latitude, let longitude {
+                items.append(URLQueryItem(name: "ll", value: "\(latitude),\(longitude)"))
+            } else if !address.isEmpty {
+                items.append(URLQueryItem(name: "address", value: address))
+            }
+            components.queryItems = items
+        }
+        return components.url
+    }
 }
 
 /// Finding restaurants. Apple Maps is free and needs nothing set up; Yelp ratings show up
 /// too if you add a Yelp API key in Settings (Yelp charges for its API).
 enum PlaceSearch {
     static let yelpAccount = "yelpKey"
+    static let googleAccount = "googlePlacesKey"
 
     static var hasYelpKey: Bool { !(Keychain.read(yelpAccount) ?? "").isEmpty }
+    static var hasGoogleKey: Bool { !(Keychain.read(googleAccount) ?? "").isEmpty }
+
+    /// Google when picked in Settings and a key is set; otherwise Apple Maps.
+    static var searchesGoogle: Bool {
+        hasGoogleKey && UserDefaults.standard.string(forKey: MapsApp.searchKey) == MapsApp.google.rawValue
+    }
 
     /// Around the places you've saved, or the Bay Area to start.
     static func searchRegion(near restaurants: [Restaurant]) -> MKCoordinateRegion {
@@ -77,6 +129,92 @@ enum PlaceSearch {
         case .some(.winery): return "Winery"
         case .some(.foodMarket): return "Market"
         default: return ""
+        }
+    }
+
+    // MARK: Google Places (New)
+
+    enum GoogleError: LocalizedError {
+        case noKey, http(Int)
+        var errorDescription: String? {
+            switch self {
+            case .noKey: return "Add a Google Places API key in Settings to search with Google."
+            case .http(let code): return code == 403 || code == 400 ? "Google didn't accept the API key (is the Places API (New) turned on?)." : "Google returned an error (\(code))."
+            }
+        }
+    }
+
+    static func google(_ query: String, region: MKCoordinateRegion) async throws -> [PlaceResult] {
+        guard let key = Keychain.read(googleAccount), !key.isEmpty else { throw GoogleError.noKey }
+        var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchText")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(key, forHTTPHeaderField: "X-Goog-Api-Key")
+        request.setValue([
+            "places.id", "places.displayName", "places.formattedAddress", "places.location", "places.rating",
+            "places.userRatingCount", "places.priceLevel", "places.googleMapsUri", "places.primaryTypeDisplayName",
+            "places.nationalPhoneNumber", "places.websiteUri"
+        ].joined(separator: ","), forHTTPHeaderField: "X-Goog-FieldMask")
+        let radius = min(max(region.span.latitudeDelta * 111_000 / 2, 2_000), 50_000)
+        let body: [String: Any] = [
+            "textQuery": query,
+            "pageSize": 15,
+            "locationBias": ["circle": [
+                "center": ["latitude": region.center.latitude, "longitude": region.center.longitude],
+                "radius": radius
+            ]]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 { throw GoogleError.http(http.statusCode) }
+        return try parseGoogle(data)
+    }
+
+    private struct GoogleResponse: Decodable {
+        struct Text: Decodable { let text: String? }
+        struct LatLng: Decodable { let latitude: Double?; let longitude: Double? }
+        struct Place: Decodable {
+            let id: String?
+            let displayName: Text?
+            let formattedAddress: String?
+            let location: LatLng?
+            let rating: Double?
+            let userRatingCount: Int?
+            let priceLevel: String?
+            let googleMapsUri: String?
+            let primaryTypeDisplayName: Text?
+            let nationalPhoneNumber: String?
+            let websiteUri: String?
+        }
+        let places: [Place]?
+    }
+
+    static func priceSymbols(_ level: String?) -> String {
+        switch level {
+        case "PRICE_LEVEL_INEXPENSIVE": return "$"
+        case "PRICE_LEVEL_MODERATE": return "$$"
+        case "PRICE_LEVEL_EXPENSIVE": return "$$$"
+        case "PRICE_LEVEL_VERY_EXPENSIVE": return "$$$$"
+        default: return ""
+        }
+    }
+
+    static func parseGoogle(_ data: Data) throws -> [PlaceResult] {
+        let response = try JSONDecoder().decode(GoogleResponse.self, from: data)
+        return (response.places ?? []).compactMap { p in
+            guard let name = p.displayName?.text, !name.isEmpty else { return nil }
+            let google = p.id.map {
+                PlaceResult.Google(id: $0, rating: p.rating ?? 0, reviews: p.userRatingCount ?? 0, url: p.googleMapsUri ?? "")
+            }
+            return PlaceResult(name: name,
+                               address: p.formattedAddress ?? "",
+                               latitude: p.location?.latitude,
+                               longitude: p.location?.longitude,
+                               cuisine: p.primaryTypeDisplayName?.text ?? "",
+                               price: priceSymbols(p.priceLevel),
+                               phone: p.nationalPhoneNumber ?? "",
+                               website: p.websiteUri ?? "",
+                               google: google)
         }
     }
 

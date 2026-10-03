@@ -20,7 +20,8 @@ struct DailyApp: App {
             WorkoutSession.self,
             SetLog.self,
             FocusSession.self,
-            Restaurant.self
+            Restaurant.self,
+            JournalEntry.self
         ])
     }
 }
@@ -114,6 +115,7 @@ struct RootView: View {
         }
         refreshWidgets()
         Task { await WidgetSync.endFinishedCountdowns() }
+        Task { await CheckIn.updateReminder() }
     }
 
     private func refreshWidgets() {
