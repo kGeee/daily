@@ -49,13 +49,13 @@ enum Backup {
     static let stringKeys = [Pref.shuttleStop, Pref.homeStation, Pref.morningTrains, Pref.eveningTrains,
                              Pref.liveStationName, Pref.liveHomeStops, Pref.liveSunnyvaleStops, Pref.liveMountainViewStops,
                              Pref.directionToWork, "weekPattern"]
-    static let dataKeys = ["pref.routines", "pref.timetableList", "pref.stepOverrides"]
+    static let dataKeys = ["pref.routines", "pref.timetableList", "pref.stepOverrides", DayTypes.key]
 
     /// Times for every timetable (the built-in Caltrain ones are already in stringKeys).
     static var timetableKeys: [String] {
         Timetables.all.map { Timetables.timesKey($0.id) }.filter { !stringKeys.contains($0) }
     }
-    static let boolKeys = ["remindersOn"]
+    static let boolKeys = ["remindersOn", Setup.doneKey]
 
     @MainActor
     static func export(context: ModelContext) throws -> URL {

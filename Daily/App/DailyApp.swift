@@ -35,6 +35,7 @@ struct RootView: View {
     @Query private var checks: [BlockCheck]
     @State private var pendingImport: SharedStore.PendingImport?
     @State private var addingEvent = false
+    @State private var showSetup = Setup.needsSetup()
     @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
     @AppStorage("remindersOn") private var remindersOn = false
     @AppStorage(Pref.revision) private var revision = 0
@@ -93,6 +94,12 @@ struct RootView: View {
         }
         .sheet(isPresented: $addingEvent) {
             EventEditor(event: nil, defaultDay: Date())
+        }
+        .fullScreenCover(isPresented: $showSetup) {
+            SetupView {
+                UserDefaults.standard.set(true, forKey: Setup.doneKey)
+                showSetup = false
+            }
         }
     }
 

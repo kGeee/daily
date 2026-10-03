@@ -149,36 +149,34 @@ struct TodayView: View {
                     .background(Palette.card, in: Circle())
             }
             .accessibilityLabel("Settings")
-            if let type = planner.type(for: selectedDay) {
-                Menu {
-                    ForEach(DayType.allCases) { t in
-                        Button(t.title) { setType(t) }
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Circle().fill(type.color).frame(width: 8, height: 8)
-                        Text(type.title).font(.subheadline.weight(.semibold))
-                        Image(systemName: "chevron.down").font(.caption2.weight(.bold))
-                    }
-                    .foregroundStyle(Palette.ink)
-                    .padding(.horizontal, 12)
-                    .frame(height: 36)
-                    .overlay(Capsule().stroke(type.color, lineWidth: 1.5))
+            let type = planner.type(for: selectedDay)
+            Menu {
+                ForEach(DayType.allCases) { t in
+                    Button(t.title) { setType(t) }
                 }
-            } else {
-                Text("Weekend")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Palette.muted)
+                Divider()
+                Button("Day off", systemImage: "sun.max") { setType(nil) }
+            } label: {
+                HStack(spacing: 8) {
+                    Circle().fill(type?.color ?? Palette.idle).frame(width: 8, height: 8)
+                    Text(type?.short ?? "Day off").font(.subheadline.weight(.semibold))
+                    Image(systemName: "chevron.down").font(.caption2.weight(.bold))
+                }
+                .foregroundStyle(type == nil ? Palette.muted : Palette.ink)
+                .padding(.horizontal, 12)
+                .frame(height: 36)
+                .overlay(Capsule().stroke(type?.color ?? Palette.line, lineWidth: 1.5))
             }
         }
         .padding(.top, 8)
     }
 
-    private func setType(_ type: DayType) {
+    private func setType(_ type: DayType?) {
+        let raw = type?.rawValue ?? DayPlanner.off
         if let existing = overrides.first(where: { $0.dayKey == dayKey }) {
-            existing.typeRaw = type.rawValue
+            existing.typeRaw = raw
         } else {
-            context.insert(DayTypeOverride(dayKey: dayKey, typeRaw: type.rawValue))
+            context.insert(DayTypeOverride(dayKey: dayKey, typeRaw: raw))
         }
     }
 

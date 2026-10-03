@@ -63,25 +63,29 @@ struct CommuteSettingsView: View {
             }
 
             Section {
-                ForEach(weekdays, id: \.self) { weekday in
-                    Picker(weekdayName(weekday), selection: Binding(
-                        get: { planner.usualType(forWeekday: weekday) ?? .shuttle },
+                ForEach([2, 3, 4, 5, 6, 7, 1], id: \.self) { weekday in
+                    Picker(weekdayName(weekday), selection: Binding<DayType?>(
+                        get: { planner.usualType(forWeekday: weekday) },
                         set: { pattern = DayPlanner.updating(pattern: pattern, weekday: weekday, to: $0) }
                     )) {
-                        ForEach(DayType.allCases) { t in Text(t.title).tag(t) }
+                        ForEach(DayType.allCases) { t in Text(t.title).tag(Optional(t)) }
+                        Text("Day off").tag(DayType?.none)
                     }
                 }
             } header: {
                 Text("Your usual week")
+            } footer: {
+                Text("Want different kinds of day (driving, another train line, a gym day)? Settings → Set up my days again.")
             }
 
             Section {
                 ForEach(thisWeek, id: \.self) { day in
-                    Picker(day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()), selection: Binding(
-                        get: { planner.type(for: day) ?? .shuttle },
+                    Picker(day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()), selection: Binding<DayType?>(
+                        get: { planner.type(for: day) },
                         set: { setType($0, on: day) }
                     )) {
-                        ForEach(DayType.allCases) { t in Text(t.title).tag(t) }
+                        ForEach(DayType.allCases) { t in Text(t.title).tag(Optional(t)) }
+                        Text("Day off").tag(DayType?.none)
                     }
                 }
             } header: {
@@ -191,12 +195,13 @@ struct CommuteSettingsView: View {
             .filter { (2...6).contains(cal.component(.weekday, from: $0)) && $0 >= today }
     }
 
-    private func setType(_ type: DayType, on day: Date) {
+    private func setType(_ type: DayType?, on day: Date) {
         let key = DayKey.of(day)
+        let raw = type?.rawValue ?? DayPlanner.off
         if let existing = overrides.first(where: { $0.dayKey == key }) {
-            existing.typeRaw = type.rawValue
+            existing.typeRaw = raw
         } else {
-            context.insert(DayTypeOverride(dayKey: key, typeRaw: type.rawValue))
+            context.insert(DayTypeOverride(dayKey: key, typeRaw: raw))
         }
     }
 

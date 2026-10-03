@@ -173,45 +173,112 @@ enum MySchedule {
     }
 }
 
-enum DayType: String, CaseIterable, Identifiable {
-    case shuttle, gym, caltrain, mountainView
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .shuttle: return "Shuttle day"
-        case .gym: return "Gym day"
-        case .caltrain: return "Caltrain day"
-        case .mountainView: return "Mountain View day"
-        }
-    }
-
-    var short: String {
-        switch self {
-        case .shuttle: return "Shuttle"
-        case .gym: return "Gym"
-        case .caltrain: return "Caltrain"
-        case .mountainView: return "Mtn View"
-        }
-    }
+/// Colors a kind of day can use (all from Palette).
+enum DayColor: String, Codable, CaseIterable {
+    case commute, gym, caltrain, general, food, water, sleep, focus
 
     var color: Color {
         switch self {
-        case .shuttle: return Palette.commute
+        case .commute: return Palette.commute
         case .gym: return Palette.gym
         case .caltrain: return Palette.caltrain
-        case .mountainView: return Palette.general
+        case .general: return Palette.general
+        case .food: return Palette.food
+        case .water: return Palette.water
+        case .sleep: return Palette.sleep
+        case .focus: return Palette.focus
         }
     }
 
     var tint: Color {
         switch self {
-        case .shuttle: return Palette.commuteTint
+        case .commute: return Palette.commuteTint
         case .gym: return Palette.gymTint
         case .caltrain: return Palette.caltrainTint
-        case .mountainView: return Palette.generalTint
+        case .general: return Palette.generalTint
+        case .food: return Palette.foodTint
+        case .water: return Palette.waterTint
+        case .sleep: return Palette.circle
+        case .focus: return Palette.focusTint
         }
     }
+}
+
+/// How a kind of day is shown: "Driving day" / "Drive", in a color.
+struct DayTypeInfo: Codable, Hashable, Identifiable {
+    var id: String
+    var name: String
+    var short: String
+    var color: DayColor
+}
+
+/// The kinds of day you have set up. Until you run setup, these are the original four.
+enum DayTypes {
+    static let key = "pref.dayTypes"
+
+    static let builtIns: [DayTypeInfo] = [
+        DayTypeInfo(id: "shuttle", name: "Shuttle day", short: "Shuttle", color: .commute),
+        DayTypeInfo(id: "gym", name: "Gym day", short: "Gym", color: .gym),
+        DayTypeInfo(id: "caltrain", name: "Caltrain day", short: "Caltrain", color: .caltrain),
+        DayTypeInfo(id: "mountainView", name: "Mountain View day", short: "Mtn View", color: .general)
+    ]
+
+    nonisolated(unsafe) private static var cache: (data: Data?, list: [DayTypeInfo])? = nil
+
+    static var all: [DayTypeInfo] {
+        let data = UserDefaults.standard.data(forKey: key)
+        if let cache, cache.data == data { return cache.list }
+        let list: [DayTypeInfo]
+        if let data, let saved = try? JSONDecoder().decode([DayTypeInfo].self, from: data) {
+            list = saved
+        } else {
+            list = builtIns
+        }
+        cache = (data, list)
+        return list
+    }
+
+    static func save(_ list: [DayTypeInfo]) {
+        if let data = try? JSONEncoder().encode(list) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    static func info(_ id: String) -> DayTypeInfo? { all.first { $0.id == id } }
+}
+
+/// A kind of day (shuttle day, driving day, gym day…). Which ones exist is up to you (see `DayTypes`).
+struct DayType: Hashable, Identifiable {
+    let rawValue: String
+    var id: String { rawValue }
+
+    /// Only kinds of day you have set up.
+    init?(rawValue: String) {
+        guard DayTypes.info(rawValue) != nil else { return nil }
+        self.rawValue = rawValue
+    }
+
+    fileprivate init(id: String) {
+        self.rawValue = id
+    }
+
+    static let shuttle = DayType(id: "shuttle")
+    static let gym = DayType(id: "gym")
+    static let caltrain = DayType(id: "caltrain")
+    static let mountainView = DayType(id: "mountainView")
+
+    static var allCases: [DayType] { DayTypes.all.map { DayType(id: $0.id) } }
+
+    private var info: DayTypeInfo {
+        DayTypes.info(rawValue)
+            ?? DayTypes.builtIns.first { $0.id == rawValue }
+            ?? DayTypeInfo(id: rawValue, name: rawValue.capitalized + " day", short: rawValue.capitalized, color: .general)
+    }
+
+    var title: String { info.name }
+    var short: String { info.short }
+    var color: Color { info.color.color }
+    var tint: Color { info.color.tint }
 }
 
 enum BlockCategory {
@@ -263,30 +330,35 @@ struct DayPlanner {
     var pattern: String
     var overrides: [DayTypeOverride]
 
-    /// weekday: 1 = Sunday … 7 = Saturday. Weekends have no commute.
+    /// The pattern lists Mon…Fri, then optionally Sat and Sun. "off" (or anything unknown) = no commute.
+    static func patternIndex(forWeekday weekday: Int) -> Int {
+        weekday == 1 ? 6 : weekday - 2   // weekday: 1 = Sunday … 7 = Saturday
+    }
+
     func usualType(forWeekday weekday: Int) -> DayType? {
-        guard (2...6).contains(weekday) else { return nil }
         let parts = pattern.split(separator: ",").map(String.init)
-        let index = weekday - 2
-        guard index < parts.count else { return nil }
+        let index = Self.patternIndex(forWeekday: weekday)
+        guard index >= 0, index < parts.count else { return nil }
         return DayType(rawValue: parts[index])
     }
 
     func type(for date: Date) -> DayType? {
         let key = DayKey.of(date)
-        if let override = overrides.first(where: { $0.dayKey == key }),
-           let type = DayType(rawValue: override.typeRaw) {
-            return type
+        if let override = overrides.first(where: { $0.dayKey == key }) {
+            return DayType(rawValue: override.typeRaw)   // "off" = a day off
         }
         return usualType(forWeekday: Calendar.current.component(.weekday, from: date))
     }
 
-    static func updating(pattern: String, weekday: Int, to type: DayType) -> String {
+    static func updating(pattern: String, weekday: Int, to type: DayType?) -> String {
         var parts = pattern.split(separator: ",").map(String.init)
-        while parts.count < 5 { parts.append(DayType.shuttle.rawValue) }
-        parts[weekday - 2] = type.rawValue
+        let index = patternIndex(forWeekday: weekday)
+        while parts.count < max(5, index + 1) { parts.append(parts.count < 5 ? DayType.shuttle.rawValue : DayPlanner.off) }
+        parts[index] = type?.rawValue ?? DayPlanner.off
         return parts.joined(separator: ",")
     }
+
+    static let off = "off"
 
     func blocks(for day: Date, lunchNote: String?, dinnerNote: String?,
                 gymNote: String? = nil, events: [CustomEvent] = []) -> [TimelineBlock] {

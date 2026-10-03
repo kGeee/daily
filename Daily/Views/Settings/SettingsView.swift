@@ -88,6 +88,7 @@ struct SettingsView: View {
     @AppStorage(Pref.calorieGoal) private var calorieGoal = Pref.calorieGoalDefault
     @AppStorage(Pref.proteinGoal) private var proteinGoal = Pref.proteinGoalDefault
     @State private var exportURL: URL?
+    @State private var showSetup = false
     @State private var backupMessage: String?
     @State private var importing = false
     @State private var pendingRestore: URL?
@@ -125,6 +126,11 @@ struct SettingsView: View {
                         CommuteSettingsView(embedded: true)
                     } label: {
                         Label("Commute, trains and reminders", systemImage: "tram.fill")
+                    }
+                    Button {
+                        showSetup = true
+                    } label: {
+                        Label("Set up my days again", systemImage: "wand.and.stars")
                     }
                 } footer: {
                     Text("Your routines for each kind of day, timetables, live Caltrain and departure reminders.")
@@ -213,6 +219,9 @@ struct SettingsView: View {
                     Button("Done") { dismiss() }
                 }
             }
+        }
+        .fullScreenCover(isPresented: $showSetup) {
+            SetupView { showSetup = false }
         }
         .onDisappear { revision += 1 }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in

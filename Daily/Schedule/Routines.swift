@@ -76,19 +76,22 @@ enum Timetables {
 // MARK: - Routine steps
 
 enum StepKind: String, Codable, CaseIterable, Identifiable {
-    case walk, shuttle, vta, caltrain, work, gym, hangout, other
+    case walk, shuttle, vta, caltrain, work, gym, hangout, other, drive, bus, bike
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .walk: return "Walk / leave"
         case .shuttle: return "Shuttle"
-        case .vta: return "VTA"
-        case .caltrain: return "Caltrain"
+        case .vta: return "VTA / light rail"
+        case .caltrain: return "Train"
         case .work: return "Work"
         case .gym: return "Gym"
         case .hangout: return "Hang out"
         case .other: return "Other"
+        case .drive: return "Drive"
+        case .bus: return "Bus"
+        case .bike: return "Bike"
         }
     }
 
@@ -102,12 +105,15 @@ enum StepKind: String, Codable, CaseIterable, Identifiable {
         case .gym: return "dumbbell.fill"
         case .hangout: return "cup.and.saucer.fill"
         case .other: return "star.fill"
+        case .drive: return "car.fill"
+        case .bus: return "bus.doubledecker.fill"
+        case .bike: return "bicycle"
         }
     }
 
     var category: BlockCategory {
         switch self {
-        case .walk, .shuttle, .vta, .caltrain: return .commute
+        case .walk, .shuttle, .vta, .caltrain, .drive, .bus, .bike: return .commute
         case .work: return .work
         case .gym: return .gym
         case .hangout, .other: return .general
@@ -115,7 +121,7 @@ enum StepKind: String, Codable, CaseIterable, Identifiable {
     }
 
     /// Transit steps count as departures by default (leave-by countdown, reminders).
-    var isTransit: Bool { [.walk, .shuttle, .vta, .caltrain].contains(self) }
+    var isTransit: Bool { [.walk, .shuttle, .vta, .caltrain, .drive, .bus, .bike].contains(self) }
 }
 
 enum StepTiming: String, Codable, CaseIterable, Identifiable {
@@ -226,8 +232,8 @@ enum Routines {
         let shuttleOut = RoutineStep(id: "out", title: "Shuttle to work", kind: .shuttle, timing: .fixed,
                                      time: MySchedule.shuttleOut.totalMinutes, duration: 30,
                                      walkMinutes: MySchedule.walkToStopMinutes, note: MySchedule.shuttleStop)
-        switch type {
-        case .shuttle:
+        switch type.rawValue {
+        case "shuttle":
             return [
                 shuttleOut,
                 RoutineStep(id: "work", title: "Work", kind: .work, timing: .fixed,
@@ -236,7 +242,7 @@ enum Routines {
                 RoutineStep(id: "home", title: "Shuttle home", kind: .shuttle, timing: .fixed,
                             time: MySchedule.shuttleHome.totalMinutes, duration: 30, note: "From the work stop")
             ]
-        case .gym:
+        case "gym":
             let gymEnd = MySchedule.gymEnd.totalMinutes
             return [
                 shuttleOut,
@@ -253,7 +259,7 @@ enum Routines {
                             duration: MySchedule.caltrainRideMinutes, walkMinutes: MySchedule.gymToStationMinutes,
                             note: "From Sunnyvale")
             ]
-        case .caltrain:
+        case "caltrain":
             let mustLeaveBy = MySchedule.workStart.totalMinutes - MySchedule.caltrainRideMinutes - MySchedule.lastMileMinutes
             return [
                 RoutineStep(id: "out", title: "Caltrain to Sunnyvale", kind: .caltrain, timing: .lastBefore,
@@ -271,7 +277,7 @@ enum Routines {
                             readyAfterPrevious: true, timetableID: Timetable.fromSunnyvale,
                             duration: MySchedule.caltrainRideMinutes, note: "From Sunnyvale")
             ]
-        case .mountainView:
+        case "mountainView":
             return [
                 shuttleOut,
                 RoutineStep(id: "work", title: "Work", kind: .work, timing: .fixed,
@@ -285,6 +291,9 @@ enum Routines {
                             readyAfterPrevious: true, timetableID: Timetable.fromMountainView,
                             duration: MySchedule.caltrainRideMinutes, walkMinutes: 5, note: "From Mountain View")
             ]
+        default:
+            // A kind of day you made yourself starts empty until you add steps.
+            return []
         }
     }
 }
