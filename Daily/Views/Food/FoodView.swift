@@ -305,11 +305,13 @@ struct FoodTodaySection: View {
                     draft = LogDraft(slot: slot, source: .out)
                 } else {
                     let recipe = recipes.first { $0.name == planned.title }
-                    context.insert(FoodEntry(slot: slot, name: planned.title, source: .prepped,
-                                             calories: recipe?.caloriesPerServing,
-                                             protein: recipe?.proteinPerServing,
-                                             carbs: recipe?.carbsPerServing,
-                                             fat: recipe?.fatPerServing))
+                    let amount = recipe?.unitsPerMeal ?? 1
+                    let n = recipe?.nutrition(for: amount)
+                    let title = recipe.map { $0.hasCustomUnit ? "\(planned.title) (\($0.amountLabel(amount)))" : planned.title }
+                        ?? planned.title
+                    context.insert(FoodEntry(slot: slot, name: title, source: .prepped,
+                                             calories: n?.calories, protein: n?.protein,
+                                             carbs: n?.carbs, fat: n?.fat))
                 }
             }
             .font(.caption.weight(.heavy))
@@ -390,7 +392,7 @@ struct FoodTodaySection: View {
     }
 
     private var prepCard: some View {
-        let meals = recipes.reduce(0) { $0 + $1.servings }
+        let meals = recipes.reduce(0) { $0 + $1.mealCount }
         return HStack(spacing: 14) {
             Image(systemName: "frying.pan.fill")
                 .font(.system(size: 18, weight: .semibold))
@@ -422,6 +424,9 @@ struct LogMealSheet: View {
     @Query(sort: \FoodEntry.date, order: .reverse) private var allEntries: [FoodEntry]
     @State private var restaurantID: UUID?
     @State private var findingPlace = false
+    /// The recipe picked below (by name) and how much of it you had, in its units.
+    @State private var chosenRecipe: String?
+    @State private var amount: Double = 1
 
     @State private var name = ""
     @State private var slot: MealSlot
@@ -456,11 +461,63 @@ struct LogMealSheet: View {
     private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
 
     private func use(_ recipe: Recipe) {
-        name = recipe.name
-        calories = recipe.caloriesPerServing.map(String.init) ?? ""
-        protein = recipe.proteinPerServing.map(String.init) ?? ""
-        carbs = recipe.carbsPerServing.map(String.init) ?? ""
-        fat = recipe.fatPerServing.map(String.init) ?? ""
+        chosenRecipe = recipe.name
+        amount = recipe.unitsPerMeal
+        applyAmount(recipe)
+    }
+
+    private var selectedRecipe: Recipe? {
+        chosenRecipe.flatMap { n in recipes.first { $0.name == n } }
+    }
+
+    /// Fills the name and nutrition for how much of the recipe you had.
+    private func applyAmount(_ recipe: Recipe) {
+        let n = recipe.nutrition(for: amount)
+        let showAmount = recipe.hasCustomUnit || amount != 1
+        name = showAmount ? "\(recipe.name) (\(recipe.amountLabel(amount)))" : recipe.name
+        calories = n.calories.map(String.init) ?? ""
+        protein = n.protein.map(String.init) ?? ""
+        carbs = n.carbs.map(String.init) ?? ""
+        fat = n.fat.map(String.init) ?? ""
+    }
+
+    private func amountRow(_ recipe: Recipe) -> some View {
+        let step = recipe.hasCustomUnit && recipe.unitsPerMeal >= 2 ? 1.0 : 0.5
+        return HStack(spacing: 10) {
+            Text("How much")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Palette.ink)
+            Spacer()
+            amountButton("minus", enabled: amount > step) {
+                amount = max(step, amount - step)
+                applyAmount(recipe)
+            }
+            Text(recipe.amountLabel(amount))
+                .font(.subheadline.weight(.bold).monospacedDigit())
+                .foregroundStyle(Palette.ink)
+                .frame(minWidth: 96)
+                .contentTransition(.numericText())
+            amountButton("plus", enabled: true) {
+                amount += step
+                applyAmount(recipe)
+            }
+        }
+        .sensoryFeedback(.selection, trigger: amount)
+    }
+
+    private func amountButton(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            withAnimation(.snappy(duration: 0.2)) { action() }
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(Palette.ink)
+                .frame(width: 34, height: 34)
+                .background(Palette.card2, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.4)
     }
 
     private func estimate() {
@@ -552,11 +609,15 @@ struct LogMealSheet: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(recipes) { recipe in
-                                ChoiceChip(title: recipe.name, isOn: name == recipe.name, tint: Palette.food) {
+                                ChoiceChip(title: recipe.name, isOn: chosenRecipe == recipe.name, tint: Palette.food) {
                                     withAnimation(.snappy) { use(recipe) }
                                 }
                             }
                         }
+                    }
+                    if let recipe = selectedRecipe {
+                        amountRow(recipe)
+                            .transition(.opacity)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

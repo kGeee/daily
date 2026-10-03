@@ -20,7 +20,9 @@ struct RecipeDetailView: View {
                         Text(recipe.name)
                             .font(.system(size: 28, weight: .heavy))
                             .foregroundStyle(Palette.ink)
-                        Text("Makes \(recipe.servings) · \(recipe.slot.title)" + (recipe.note.isEmpty ? "" : " · " + recipe.note))
+                        Text("Makes \(recipe.amountLabel(Double(recipe.servings)))"
+                             + (recipe.hasCustomUnit ? " (\(recipe.mealCount) meals)" : "")
+                             + " · \(recipe.slot.title)" + (recipe.note.isEmpty ? "" : " · " + recipe.note))
                             .font(.subheadline)
                             .foregroundStyle(Palette.muted)
                     }
@@ -271,7 +273,7 @@ struct ImportRecipeView: View {
                 if let parsed {
                     Section("Preview") {
                         Text(parsed.name).font(.headline)
-                        Text("Makes \(Int(parsed.servings ?? 1)) · \(parsed.ingredients.count) ingredients · \(parsed.steps.count) steps")
+                        Text("Makes \(Int(parsed.servings ?? 1)) \(parsed.yieldUnit ?? "servings") · \(parsed.ingredients.count) ingredients · \(parsed.steps.count) steps")
                             .font(.subheadline)
                             .foregroundStyle(Palette.muted)
                         if let cal = parsed.calories {
@@ -385,6 +387,11 @@ struct ImportRecipeView: View {
         recipe.carbsPerServing = parsed.carbs.map { Int($0.rounded()) }
         recipe.fatPerServing = parsed.fat.map { Int($0.rounded()) }
         recipe.sourceURL = link.trimmingCharacters(in: .whitespaces)
+        let unit = (parsed.yieldUnit ?? "").trimmingCharacters(in: .whitespaces)
+        if !unit.isEmpty && !["serving", "servings"].contains(unit.lowercased()) {
+            recipe.yieldUnit = unit
+            recipe.unitsPerMeal = max(parsed.unitsPerMeal ?? 1, 0.5)
+        }
         context.insert(recipe)
         dismiss()
     }

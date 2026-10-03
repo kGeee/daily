@@ -169,7 +169,7 @@ struct WeekPlanView: View {
         let counts = Dictionary(grouping: weekPlans.filter { !$0.isEatingOut }, by: { $0.title }).mapValues { $0.count }
         return counts.keys.sorted().map { name in
             Usage(name: name, planned: counts[name] ?? 0,
-                  servings: recipes.first { $0.name == name }?.servings ?? 0)
+                  servings: recipes.first { $0.name == name }?.mealCount ?? 0)
         }
     }
 
@@ -279,7 +279,7 @@ struct WeekPlanView: View {
             }
             let plannedCalories = [MealSlot.lunch, .dinner]
                 .compactMap { plan(for: day, slot: $0) }
-                .compactMap { p in recipes.first { $0.name == p.title }?.caloriesPerServing }
+                .compactMap { p in recipes.first { $0.name == p.title }.flatMap { $0.nutrition(for: $0.unitsPerMeal).calories } }
                 .reduce(0, +)
             if plannedCalories > 0 {
                 Text("~\(plannedCalories) cal planned for lunch + dinner")

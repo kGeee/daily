@@ -85,3 +85,37 @@ final class InstagramTests: XCTestCase {
         XCTAssertEqual(InstagramFetcher.firstURL(in: text)?.absoluteString, "https://www.instagram.com/reel/C9xK2abc/")
     }
 }
+
+final class RecipePortionTests: XCTestCase {
+    private func nuggets() -> Recipe {
+        let r = Recipe(name: "Chicken nuggets", servings: 30, slot: .dinner)
+        r.yieldUnit = "nuggets"
+        r.unitsPerMeal = 6
+        r.caloriesPerServing = 45
+        r.proteinPerServing = 4
+        r.carbsPerServing = 2
+        r.fatPerServing = 2
+        return r
+    }
+
+    func testMealsComeFromPiecesPerMeal() {
+        XCTAssertEqual(nuggets().mealCount, 5, "30 nuggets at 6 a meal")
+        XCTAssertEqual(Recipe(name: "Chili", servings: 4, slot: .dinner).mealCount, 4, "Plain servings stay one per meal")
+    }
+
+    func testNutritionScalesWithAmount() {
+        let n = nuggets().nutrition(for: 8)
+        XCTAssertEqual(n.calories, 360)
+        XCTAssertEqual(n.protein, 32)
+        XCTAssertEqual(Recipe(name: "Chili", servings: 4, slot: .dinner).nutrition(for: 1.5).calories, nil)
+    }
+
+    func testAmountLabels() {
+        let r = nuggets()
+        XCTAssertEqual(r.amountLabel(8), "8 nuggets")
+        XCTAssertEqual(r.amountLabel(1), "1 nugget")
+        let chili = Recipe(name: "Chili", servings: 4, slot: .dinner)
+        XCTAssertEqual(chili.amountLabel(1.5), "1.5 servings")
+        XCTAssertEqual(chili.amountLabel(1), "1 serving")
+    }
+}

@@ -178,7 +178,7 @@ struct AIPrepPlannerView: View {
         errorText = nil
         let slotList = openSlots.map { "\(DayKey.of($0.day)) (\($0.day.formatted(.dateTime.weekday(.wide)))) \($0.slot.rawValue)" }
         let saved = reuse ? recipes.map { r in
-            "- \(r.name): makes \(r.servings)" + (r.macroLine.map { ", \($0) per serving" } ?? "") + (r.note.isEmpty ? "" : ", \(r.note)")
+            "- \(r.name): makes \(r.amountLabel(Double(r.servings))) (\(r.mealCount) meals)" + (r.macroLine.map { ", \($0) per \(r.unitLabel(for: 1))" } ?? "") + (r.note.isEmpty ? "" : ", \(r.note)")
         }.joined(separator: "\n") : ""
         let prompt = """
         Plan a Sunday meal prep for one person who works an office job, goes to the gym 2-3 times a week, \

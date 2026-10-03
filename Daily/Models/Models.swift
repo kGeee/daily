@@ -85,6 +85,11 @@ final class Recipe {
     var fatPerServing: Int? = nil
     /// Where it came from, e.g. an Instagram reel link.
     var sourceURL: String = ""
+    /// What `servings` counts, e.g. "nuggets" for a recipe that makes 30 nuggets. Empty = servings.
+    /// Nutrition is per one of these.
+    var yieldUnit: String = ""
+    /// How many of those make one meal (e.g. 6 nuggets).
+    var unitsPerMeal: Double = 1
 
     init(name: String, servings: Int, slot: MealSlot, note: String = "", ingredients: String = "") {
         self.name = name
@@ -110,6 +115,33 @@ final class Recipe {
     }
 
     var hasNutrition: Bool { caloriesPerServing != nil }
+
+    var hasCustomUnit: Bool { !yieldUnit.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// "nuggets" / "servings" (or the singular for exactly one).
+    func unitLabel(for amount: Double) -> String {
+        let unit = yieldUnit.trimmingCharacters(in: .whitespaces)
+        if unit.isEmpty { return amount == 1 ? "serving" : "servings" }
+        if amount == 1, unit.count > 3, unit.hasSuffix("s") { return String(unit.dropLast()) }
+        return unit
+    }
+
+    /// How many meals the whole recipe covers.
+    var mealCount: Int {
+        max(1, Int((Double(servings) / max(unitsPerMeal, 0.1)).rounded(.down)))
+    }
+
+    /// Nutrition for eating `amount` units (servings, nuggets…).
+    func nutrition(for amount: Double) -> (calories: Int?, protein: Int?, carbs: Int?, fat: Int?) {
+        func scale(_ value: Int?) -> Int? { value.map { Int((Double($0) * amount).rounded()) } }
+        return (scale(caloriesPerServing), scale(proteinPerServing), scale(carbsPerServing), scale(fatPerServing))
+    }
+
+    /// "8 nuggets", "1.5 servings".
+    func amountLabel(_ amount: Double) -> String {
+        let number = amount == amount.rounded() ? String(Int(amount)) : String(format: "%.1f", amount)
+        return number + " " + unitLabel(for: amount)
+    }
 
     /// "520 cal · 42P 48C 16F", or nil if unknown.
     var macroLine: String? {

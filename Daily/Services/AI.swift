@@ -122,6 +122,8 @@ struct ParsedRecipe: Decodable {
     var carbs: Double?
     var fat: Double?
     var note: String?
+    var yieldUnit: String?
+    var unitsPerMeal: Double?
 }
 
 struct MacroEstimate: Decodable {
@@ -144,7 +146,12 @@ enum RecipeAI {
     static func parseRecipe(from text: String) async throws -> ParsedRecipe {
         var properties = macroProperties
         properties["name"] = ["type": "string", "description": "Short recipe name"]
-        properties["servings"] = ["type": "number", "description": "Number of servings the recipe makes"]
+        properties["servings"] = ["type": "number",
+                                  "description": "How many the recipe makes, counted in yieldUnit (e.g. 30 for '30 nuggets', or 4 servings)"]
+        properties["yieldUnit"] = ["type": "string",
+                                   "description": "What servings counts: 'servings' normally, or the piece if the recipe makes pieces, e.g. 'nuggets', 'cookies', 'egg bites'"]
+        properties["unitsPerMeal"] = ["type": "number",
+                                      "description": "How many of yieldUnit one adult eats as a meal (1 for servings, e.g. 6 for nuggets)"]
         properties["ingredients"] = ["type": "array", "items": ["type": "string"],
                                      "description": "One ingredient per item with quantity first, e.g. '2 lb chicken thighs'"] as [String: Any]
         properties["steps"] = ["type": "array", "items": ["type": "string"],
@@ -160,7 +167,8 @@ enum RecipeAI {
         let prompt = """
         Below is the text of a recipe post (for example an Instagram reel caption), which may include hashtags, \
         emojis and chatter. Extract the recipe. If quantities or steps are missing, infer reasonable ones from the dish. \
-        Estimate nutrition per serving from the ingredients using standard nutrition values. \
+        Estimate nutrition per one unit of the yield from the ingredients using standard nutrition values \
+        (per serving, or per piece when the recipe makes pieces like 30 nuggets). \
         Also say in the note whether it reheats well for meal prep.
 
         Post text:

@@ -68,7 +68,7 @@ struct GroceriesSection: View {
                 SectionLabel(text: "This week's recipes")
                 Spacer()
                 if !recipes.isEmpty {
-                    Text("\(recipes.reduce(0) { $0 + $1.servings }) meals")
+                    Text("\(recipes.reduce(0) { $0 + $1.mealCount }) meals")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(Palette.foodText)
                 }
@@ -107,7 +107,10 @@ struct GroceriesSection: View {
                         .foregroundStyle(Palette.food)
                         .frame(width: 24, height: 24)
                         .background(Palette.foodTint, in: Circle())
-                    Text("\(recipe.servings) \(recipe.slot.rawValue)\(recipe.servings == 1 ? "" : "s")")
+                    Text(recipe.hasCustomUnit
+                         ? "\(recipe.servings) \(recipe.unitLabel(for: Double(recipe.servings))) · \(recipe.mealCount) \(recipe.slot.rawValue)\(recipe.mealCount == 1 ? "" : "s")"
+                         : "\(recipe.mealCount) \(recipe.slot.rawValue)\(recipe.mealCount == 1 ? "" : "s")")
+                        .lineLimit(1)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Palette.muted)
                 }
@@ -378,6 +381,8 @@ struct AddRecipeSheet: View {
 
     @State private var name: String
     @State private var servings: Int
+    @State private var yieldUnit: String
+    @State private var unitsPerMeal: Double
     @State private var slot: MealSlot
     @State private var note: String
     @State private var ingredients: String
@@ -393,6 +398,8 @@ struct AddRecipeSheet: View {
         self.recipe = recipe
         _name = State(initialValue: recipe?.name ?? "")
         _servings = State(initialValue: recipe?.servings ?? 4)
+        _yieldUnit = State(initialValue: recipe?.yieldUnit ?? "")
+        _unitsPerMeal = State(initialValue: recipe?.unitsPerMeal ?? 1)
         _slot = State(initialValue: recipe?.slot ?? .dinner)
         _note = State(initialValue: recipe?.note ?? "Reheats well")
         _ingredients = State(initialValue: recipe?.ingredientsRaw ?? "")
@@ -429,10 +436,31 @@ struct AddRecipeSheet: View {
             Form {
                 Section {
                     TextField("Recipe name", text: $name)
-                    Stepper("Makes \(servings) meal\(servings == 1 ? "" : "s")", value: $servings, in: 1...14)
                     Picker("For", selection: $slot) {
                         ForEach(MealSlot.allCases) { s in Text(s.title).tag(s) }
                     }
+                }
+                Section {
+                    HStack {
+                        Text("Makes")
+                        TextField("4", value: $servings, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 60)
+                        TextField("servings", text: $yieldUnit)
+                            .textInputAutocapitalization(.never)
+                    }
+                    if !yieldUnit.trimmingCharacters(in: .whitespaces).isEmpty {
+                        Stepper(value: $unitsPerMeal, in: 0.5...100, step: unitsPerMeal < 3 ? 0.5 : 1) {
+                            Text("One meal is \(unitsPerMeal == unitsPerMeal.rounded() ? String(Int(unitsPerMeal)) : String(format: "%.1f", unitsPerMeal)) \(yieldUnit)")
+                        }
+                    }
+                } header: {
+                    Text("How much it makes")
+                } footer: {
+                    Text(yieldUnit.trimmingCharacters(in: .whitespaces).isEmpty
+                         ? "Leave the second box empty for servings, or name what it makes (nuggets, cookies, egg bites) to log any amount."
+                         : "That's \(max(1, Int((Double(max(servings, 1)) / max(unitsPerMeal, 0.1)).rounded(.down)))) meals. Nutrition below is per one of the \(yieldUnit).")
                 }
                 Section("Note") {
                     TextField("e.g. Reheats well, Freezes well", text: $note)
@@ -472,7 +500,7 @@ struct AddRecipeSheet: View {
                         Text(errorText).font(.footnote).foregroundStyle(Palette.gymText)
                     }
                 } header: {
-                    Text("Nutrition per serving")
+                    Text(yieldUnit.trimmingCharacters(in: .whitespaces).isEmpty ? "Nutrition per serving" : "Nutrition per one of the \(yieldUnit)")
                 }
             }
             .navigationTitle(recipe == nil ? "New recipe" : "Edit recipe")
@@ -493,13 +521,13 @@ struct AddRecipeSheet: View {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
         if let recipe {
             recipe.name = trimmed
-            recipe.servings = servings
+            recipe.servings = max(servings, 1)
             recipe.slotRaw = slot.rawValue
             recipe.note = note
             recipe.ingredientsRaw = ingredients
             apply(to: recipe)
         } else {
-            let newRecipe = Recipe(name: trimmed, servings: servings, slot: slot, note: note, ingredients: ingredients)
+            let newRecipe = Recipe(name: trimmed, servings: max(servings, 1), slot: slot, note: note, ingredients: ingredients)
             apply(to: newRecipe)
             context.insert(newRecipe)
         }
@@ -507,6 +535,8 @@ struct AddRecipeSheet: View {
     }
 
     private func apply(to recipe: Recipe) {
+        recipe.yieldUnit = yieldUnit.trimmingCharacters(in: .whitespaces)
+        recipe.unitsPerMeal = recipe.yieldUnit.isEmpty ? 1 : unitsPerMeal
         recipe.stepsRaw = steps
         recipe.caloriesPerServing = Int(calories.trimmingCharacters(in: .whitespaces))
         recipe.proteinPerServing = Int(protein.trimmingCharacters(in: .whitespaces))

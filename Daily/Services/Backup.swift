@@ -28,6 +28,7 @@ enum Backup {
     struct RecipeDTO: Codable {
         var name: String; var servings: Int; var slot: String; var note: String; var createdAt: Date
         var ingredients: String; var steps: String; var calories, protein, carbs, fat: Int?; var sourceURL: String
+        var yieldUnit: String? = nil; var unitsPerMeal: Double? = nil
     }
     struct PlanDTO: Codable { var dayKey, slot, title: String }
     struct WaterDTO: Codable { var date: Date; var ounces: Int }
@@ -79,7 +80,8 @@ enum Backup {
         file.recipes = try context.fetch(FetchDescriptor<Recipe>()).map {
             RecipeDTO(name: $0.name, servings: $0.servings, slot: $0.slotRaw, note: $0.note, createdAt: $0.createdAt,
                       ingredients: $0.ingredientsRaw, steps: $0.stepsRaw, calories: $0.caloriesPerServing,
-                      protein: $0.proteinPerServing, carbs: $0.carbsPerServing, fat: $0.fatPerServing, sourceURL: $0.sourceURL)
+                      protein: $0.proteinPerServing, carbs: $0.carbsPerServing, fat: $0.fatPerServing, sourceURL: $0.sourceURL,
+                      yieldUnit: $0.yieldUnit, unitsPerMeal: $0.unitsPerMeal)
         }
         file.plans = try context.fetch(FetchDescriptor<MealPlan>()).map { PlanDTO(dayKey: $0.dayKey, slot: $0.slotRaw, title: $0.title) }
         file.water = try context.fetch(FetchDescriptor<WaterEntry>()).map { WaterDTO(date: $0.date, ounces: $0.ounces) }
@@ -158,6 +160,8 @@ enum Backup {
             recipe.carbsPerServing = r.carbs
             recipe.fatPerServing = r.fat
             recipe.sourceURL = r.sourceURL
+            recipe.yieldUnit = r.yieldUnit ?? ""
+            recipe.unitsPerMeal = r.unitsPerMeal ?? 1
             context.insert(recipe)
         }
         for p in file.plans { context.insert(MealPlan(dayKey: p.dayKey, slot: MealSlot(rawValue: p.slot) ?? .dinner, title: p.title)) }
