@@ -121,8 +121,10 @@ final class CustomEvent {
 struct EventEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Query private var checks: [BlockCheck]
 
     let event: CustomEvent?
+    private let day: Date
 
     @State private var title: String
     @State private var note: String
@@ -131,11 +133,15 @@ struct EventEditor: View {
     @State private var kind: EventKind
     @State private var repeats: EventRepeat
     @State private var remind: Bool
+    @State private var showDate = false
+    @State private var showTime = false
+    @FocusState private var titleFocused: Bool
 
-    private let durations = [0, 15, 30, 45, 60, 90, 120, 180]
+    private let durations = [0, 15, 30, 45, 60, 90, 120, 180, 240]
 
     init(event: CustomEvent?, defaultDay: Date) {
         self.event = event
+        self.day = defaultDay
         let cal = Calendar.current
         let suggested: Date = {
             if cal.isDateInToday(defaultDay) {
@@ -156,52 +162,132 @@ struct EventEditor: View {
         _remind = State(initialValue: event?.remind ?? true)
     }
 
+    private var trimmedTitle: String { title.trimmingCharacters(in: .whitespaces) }
+
+    private var timeText: String {
+        let begin = start.formatted(date: .omitted, time: .shortened)
+        guard duration > 0 else { return begin }
+        return begin + " – " + start.addingTimeInterval(Double(duration) * 60).formatted(date: .omitted, time: .shortened)
+    }
+
+    private var relativeDay: String? {
+        let cal = Calendar.current
+        if cal.isDateInToday(start) { return "Today" }
+        if cal.isDateInTomorrow(start) { return "Tomorrow" }
+        return nil
+    }
+
+    // Check-off for this event on the day it was opened from.
+    private var checkKey: (day: String, block: String)? {
+        guard let event else { return nil }
+        return (DayKey.of(day), "event-" + event.id.uuidString)
+    }
+
+    private var isDone: Bool {
+        guard let key = checkKey else { return false }
+        return checks.contains { $0.dayKey == key.day && $0.blockID == key.block }
+    }
+
+    private func toggleDone() {
+        guard let key = checkKey else { return }
+        if let existing = checks.first(where: { $0.dayKey == key.day && $0.blockID == key.block }) {
+            context.delete(existing)
+        } else {
+            context.insert(BlockCheck(dayKey: key.day, blockID: key.block))
+        }
+    }
+
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("What is it?", text: $title)
-                    TextField("Note (optional)", text: $note)
+        DetailSheetLayout {
+            DetailHero(background: kind.category.hero, symbol: kind.symbol, iconColor: kind.category.color,
+                       timeText: timeText, badges: repeats == .none ? [] : ["arrow.triangle.2.circlepath"],
+                       done: event == nil ? nil : isDone, onToggle: toggleDone,
+                       onClose: { dismiss() },
+                       trailing: {
+                           roundButton("checkmark", label: "Save", action: save)
+                               .disabled(trimmedTitle.isEmpty)
+                               .opacity(trimmedTitle.isEmpty ? 0.5 : 1)
+                       }, title: {
+                           TextField("", text: $title, prompt: Text("New event").foregroundStyle(Palette.heroOn.opacity(0.5)))
+                               .focused($titleFocused)
+                               .submitLabel(.done)
+                       })
+        } content: {
+            DetailCard {
+                DetailExpandableRow(symbol: "calendar", tint: kind.category.color,
+                                    title: start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year()),
+                                    value: relativeDay, expanded: $showDate) {
+                    DatePicker("Date", selection: $start, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .labelsHidden()
+                        .tint(kind.category.color)
                 }
-                Section {
-                    DatePicker("Starts", selection: $start)
+                DetailDivider()
+                DetailExpandableRow(symbol: "clock.fill", tint: kind.category.color, title: timeText,
+                                    expanded: $showTime) {
+                    DatePicker("Time", selection: $start, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                        .frame(maxWidth: .infinity)
+                }
+                DetailDivider()
+                Menu {
                     Picker("Length", selection: $duration) {
                         ForEach(durations, id: \.self) { minutes in
                             Text(label(for: minutes)).tag(minutes)
                         }
                     }
+                } label: {
+                    DetailRowLabel(symbol: "hourglass", tint: kind.category.color, title: "Length",
+                                   value: label(for: duration))
+                }
+                DetailDivider()
+                Menu {
                     Picker("Repeat", selection: $repeats) {
                         ForEach(EventRepeat.allCases) { r in Text(r.title).tag(r) }
                     }
+                } label: {
+                    DetailRowLabel(symbol: "arrow.triangle.2.circlepath", tint: kind.category.color,
+                                   title: repeats == .none ? "Doesn't repeat" : repeats.title)
                 }
-                Section {
-                    Picker("Type", selection: $kind) {
-                        ForEach(EventKind.allCases) { k in
-                            Label(k.title, systemImage: k.symbol).tag(k)
+                DetailDivider()
+                Button {
+                    remind.toggle()
+                } label: {
+                    DetailRowLabel(symbol: remind ? "bell.fill" : "bell.slash", tint: kind.category.color,
+                                   title: remind ? "1 Alert" : "No alert",
+                                   value: remind ? "10 min before" : "Off", chevron: false)
+                }
+                .buttonStyle(.plain)
+                .sensoryFeedback(.selection, trigger: remind)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(EventKind.allCases) { k in
+                        ChoiceChip(title: k.title, symbol: k.symbol, isOn: kind == k, tint: k.category.color) {
+                            withAnimation(.snappy) { kind = k }
                         }
                     }
-                    Toggle("Remind me 10 min before", isOn: $remind)
                 }
-                if let event {
-                    Section {
-                        Button("Delete event", role: .destructive) {
-                            context.delete(event)
-                            dismiss()
-                        }
-                    }
-                }
+                .padding(.horizontal, 2)
             }
-            .navigationTitle(event == nil ? "New event" : "Edit event")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+
+            DetailNotesCard(text: $note)
+
+            if let event {
+                DetailDeleteButton(title: "Delete event") {
+                    context.delete(event)
+                    dismiss()
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: save)
-                        .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
+            } else {
+                DetailPrimaryButton(title: "Add to timeline", symbol: "plus", fill: kind.category.color, action: save)
+                    .disabled(trimmedTitle.isEmpty)
+                    .opacity(trimmedTitle.isEmpty ? 0.5 : 1)
             }
+        }
+        .onAppear {
+            if event == nil { titleFocused = true }
         }
     }
 
@@ -212,7 +298,8 @@ struct EventEditor: View {
     }
 
     private func save() {
-        let trimmed = title.trimmingCharacters(in: .whitespaces)
+        let trimmed = trimmedTitle
+        guard !trimmed.isEmpty else { return }
         if let event {
             event.title = trimmed
             event.note = note

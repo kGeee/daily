@@ -30,23 +30,38 @@ struct FoodView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Picker("Section", selection: $tab) {
-                    ForEach(Tab.allCases) { t in
-                        Text(t.rawValue).tag(t)
+                PillSegment(Tab.allCases, selection: $tab) { $0.rawValue }
+
+                ZStack(alignment: .top) {
+                    if tab == .today {
+                        FoodTodaySection()
+                            .transition(.opacity.combined(with: .move(edge: .leading)))
+                    } else {
+                        GroceriesSection()
+                            .transition(.opacity.combined(with: .move(edge: .trailing)))
                     }
                 }
-                .pickerStyle(.segmented)
-
-                switch tab {
-                case .today: FoodTodaySection()
-                case .plan: GroceriesSection()
-                }
+                .animation(.snappy(duration: 0.3), value: tab)
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 100)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(Palette.bg.ignoresSafeArea())
         .sheet(isPresented: $showReview) {
             WeekReviewView()
+        }
+    }
+}
+
+extension MealSlot {
+    var symbol: String {
+        switch self {
+        case .breakfast: return "sunrise.fill"
+        case .lunch: return "sun.max.fill"
+        case .dinner: return "moon.stars.fill"
+        case .snack: return "carrot.fill"
         }
     }
 }
@@ -85,12 +100,81 @@ struct FoodTodaySection: View {
 
     var body: some View {
         VStack(spacing: 14) {
+            summaryCard
             weekCard
             mealsCard
             prepCard
         }
+        .animation(.snappy(duration: 0.3), value: todays.count)
+        .sensoryFeedback(.success, trigger: todays.count)
         .sheet(item: $draft) { d in
             LogMealSheet(draft: d)
+        }
+    }
+
+    // MARK: Summary
+
+    private var summaryCard: some View {
+        let calories = todays.compactMap { $0.calories }.reduce(0, +)
+        let protein = todays.compactMap { $0.protein }.reduce(0, +)
+        let carbs = todays.compactMap { $0.carbs }.reduce(0, +)
+        let fat = todays.compactMap { $0.fat }.reduce(0, +)
+        let goal = max(MySchedule.calorieGoal, 1)
+        let progress = Double(calories) / Double(goal)
+        let left = goal - calories
+
+        return HStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .stroke(Palette.idle, lineWidth: 12)
+                Circle()
+                    .trim(from: 0, to: min(progress, 1))
+                    .stroke(progress > 1.1 ? Palette.gym : Palette.food,
+                            style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.snappy(duration: 0.5), value: progress)
+                VStack(spacing: 0) {
+                    Text(calories.formatted())
+                        .font(.system(size: 26, weight: .heavy))
+                        .foregroundStyle(Palette.ink)
+                        .contentTransition(.numericText())
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    Text("of \(goal.formatted()) cal")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Palette.muted)
+                }
+                .padding(.horizontal, 14)
+            }
+            .frame(width: 118, height: 118)
+
+            VStack(alignment: .leading, spacing: 12) {
+                macroRow("Protein", grams: protein, goal: MySchedule.proteinGoal, color: Palette.food)
+                macroRow("Carbs", grams: carbs, goal: nil, color: Palette.water)
+                macroRow("Fat", grams: fat, goal: nil, color: Palette.gym)
+                Text(left >= 0 ? "\(left.formatted()) cal left" : "\((-left).formatted()) cal over")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(left >= 0 ? Palette.foodText : Palette.gymText)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .card(padding: 18)
+    }
+
+    private func macroRow(_ name: String, grams: Int, goal: Int?, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(name)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Palette.muted)
+                Spacer()
+                (Text("\(grams)g").font(.subheadline.weight(.heavy)).foregroundStyle(Palette.ink)
+                 + Text(goal.map { " / \($0)g" } ?? "").font(.caption).foregroundStyle(Palette.muted))
+                    .contentTransition(.numericText())
+            }
+            if let goal {
+                GoalBar(progress: Double(grams) / Double(max(goal, 1)), color: color)
+            }
         }
     }
 
@@ -98,24 +182,19 @@ struct FoodTodaySection: View {
         let home = thisWeek.filter { $0.source.isHome }.count
         let out = thisWeek.count - home
         let total = max(home + out, 1)
-        let calories = todays.compactMap { $0.calories }.reduce(0, +)
-        let protein = todays.compactMap { $0.protein }.reduce(0, +)
-        let carbs = todays.compactMap { $0.carbs }.reduce(0, +)
-        let fat = todays.compactMap { $0.fat }.reduce(0, +)
+        let over = out > MySchedule.eatOutGoalPerWeek
 
         return VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            HStack(alignment: .firstTextBaseline, spacing: 14) {
                 SectionLabel(text: "This week")
+                (Text("\(home)").font(.headline.weight(.heavy)).foregroundStyle(Palette.food)
+                 + Text(" home").font(.caption.weight(.semibold)).foregroundStyle(Palette.muted))
+                (Text("\(out)").font(.headline.weight(.heavy)).foregroundStyle(Palette.gym)
+                 + Text(" out").font(.caption.weight(.semibold)).foregroundStyle(Palette.muted))
                 Spacer()
-                Text("goal: eat out \(MySchedule.eatOutGoalPerWeek)× or less")
-                    .font(.caption)
-                    .foregroundStyle(out > MySchedule.eatOutGoalPerWeek ? Palette.gymText : Palette.muted)
-            }
-            HStack(alignment: .firstTextBaseline, spacing: 20) {
-                (Text("\(home)").font(.system(size: 30, weight: .heavy)).foregroundStyle(Palette.food)
-                 + Text(" home").font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted))
-                (Text("\(out)").font(.system(size: 30, weight: .heavy)).foregroundStyle(Palette.gym)
-                 + Text(" out").font(.footnote.weight(.semibold)).foregroundStyle(Palette.muted))
+                Text("goal ≤ \(MySchedule.eatOutGoalPerWeek) out")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(over ? Palette.gymText : Palette.muted)
             }
             GeometryReader { geo in
                 HStack(spacing: 3) {
@@ -129,159 +208,200 @@ struct FoodTodaySection: View {
                 }
                 .clipShape(Capsule())
             }
-            .frame(height: 10)
-
-            SectionLabel(text: "Today")
-                .padding(.top, 4)
-            HStack(spacing: 8) {
-                miniStat(label: "Calories", value: "\(calories > 0 ? calories.formatted() : "0")/\(MySchedule.calorieGoal.formatted())",
-                         progress: Double(calories) / Double(max(MySchedule.calorieGoal, 1)))
-                miniStat(label: "Protein", value: "\(protein)/\(MySchedule.proteinGoal)g",
-                         progress: Double(protein) / Double(max(MySchedule.proteinGoal, 1)))
-                miniStat(label: "Carbs", value: carbs > 0 ? "\(carbs)g" : "—")
-                miniStat(label: "Fat", value: fat > 0 ? "\(fat)g" : "—")
-            }
-        }
-        .card()
-    }
-
-    private func miniStat(label: String, value: String, progress: Double? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(Palette.muted)
-            Text(value)
-                .font(.subheadline.weight(.heavy))
-                .foregroundStyle(Palette.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            if let progress {
-                GoalBar(progress: progress, color: Palette.food)
-                    .padding(.top, 2)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.card2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
-    private var mealsCard: some View {
-        VStack(spacing: 0) {
-            ForEach(MealSlot.allCases) { slot in
-                let items = todays.filter { $0.slot == slot }
-                HStack(alignment: .top, spacing: 12) {
-                    SectionLabel(text: slot.title)
-                        .frame(width: 84, alignment: .leading)
-                        .padding(.top, 3)
-                    VStack(alignment: .leading, spacing: 6) {
-                        if items.isEmpty {
-                            if let planned = plan(for: slot) {
-                                HStack(spacing: 8) {
-                                    Text("Planned: " + planned.title)
-                                        .font(.subheadline)
-                                        .foregroundStyle(Palette.muted)
-                                    Spacer(minLength: 4)
-                                    Button(planned.isEatingOut ? "Ate out" : "Ate it") {
-                                        if planned.isEatingOut {
-                                            draft = LogDraft(slot: slot, source: .out)
-                                        } else {
-                                            let recipe = recipes.first { $0.name == planned.title }
-                                            context.insert(FoodEntry(slot: slot, name: planned.title, source: .prepped,
-                                                                     calories: recipe?.caloriesPerServing,
-                                                                     protein: recipe?.proteinPerServing,
-                                                                     carbs: recipe?.carbsPerServing,
-                                                                     fat: recipe?.fatPerServing))
-                                        }
-                                    }
-                                    .font(.caption.weight(.heavy))
-                                    .foregroundStyle(Palette.onAccent)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(planned.isEatingOut ? Palette.gym : Palette.food, in: Capsule())
-                                    .buttonStyle(.plain)
-                                }
-                            } else {
-                                Text("Not logged")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Palette.faint)
-                            }
-                        }
-                        ForEach(items) { entry in
-                            HStack(spacing: 8) {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(entry.name)
-                                        .font(.subheadline.weight(.bold))
-                                        .foregroundStyle(Palette.ink)
-                                    if let cal = entry.calories {
-                                        Text("\(cal) cal" + (entry.protein.map { " · \($0)g protein" } ?? ""))
-                                            .font(.caption)
-                                            .foregroundStyle(Palette.muted)
-                                    }
-                                }
-                                Spacer(minLength: 4)
-                                sourceTag(entry.source)
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                draft = LogDraft(slot: entry.slot, source: entry.source, name: entry.name, entry: entry)
-                            }
-                            .contextMenu {
-                                Button("Edit") {
-                                    draft = LogDraft(slot: entry.slot, source: entry.source, name: entry.name, entry: entry)
-                                }
-                                Button("Delete", role: .destructive) { context.delete(entry) }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Menu {
-                        ForEach(MealSource.allCases) { source in
-                            Button(source.title) {
-                                let planned = plan(for: slot)
-                                let name = (planned != nil && planned?.isEatingOut == (source == .out)) ? (planned?.title ?? "") : ""
-                                draft = LogDraft(slot: slot, source: source, name: name == MealPlan.eatOut ? "" : name)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(Palette.food)
-                            .frame(width: 44, height: 32)
-                    }
-                    .accessibilityLabel("Log \(slot.title)")
-                }
-                .padding(.vertical, 12)
-                if slot != MealSlot.allCases.last {
-                    Divider().overlay(Palette.line)
-                }
-            }
+            .frame(height: 8)
         }
         .card(padding: 16)
     }
 
+    // MARK: Meals
+
+    private var mealsCard: some View {
+        VStack(spacing: 0) {
+            ForEach(MealSlot.allCases) { slot in
+                slotSection(slot)
+                if slot != MealSlot.allCases.last {
+                    Rectangle().fill(Palette.line).frame(height: 1)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private func slotSection(_ slot: MealSlot) -> some View {
+        let items = todays.filter { $0.slot == slot }
+        let subtotal = items.compactMap { $0.calories }.reduce(0, +)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: slot.symbol)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Palette.food)
+                    .frame(width: 32, height: 32)
+                    .background(Palette.foodTint, in: Circle())
+                Text(slot.title)
+                    .font(.headline)
+                    .foregroundStyle(Palette.ink)
+                if subtotal > 0 {
+                    Text("\(subtotal) cal")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Palette.muted)
+                }
+                Spacer()
+                Menu {
+                    ForEach(MealSource.allCases) { source in
+                        Button(source.title, systemImage: source.isHome ? "house.fill" : "takeoutbag.and.cup.and.straw.fill") {
+                            startLog(slot: slot, source: source)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .heavy))
+                        .foregroundStyle(Palette.onAccent)
+                        .frame(width: 32, height: 32)
+                        .background(Palette.food, in: Circle())
+                }
+                .accessibilityLabel("Log \(slot.title)")
+            }
+
+            if items.isEmpty {
+                if let planned = plan(for: slot) {
+                    plannedRow(planned, slot: slot)
+                } else {
+                    Text("Nothing logged yet")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.faint)
+                        .padding(.leading, 42)
+                }
+            }
+            ForEach(items) { entry in
+                entryRow(entry)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
+            }
+        }
+        .padding(.vertical, 14)
+    }
+
+    private func plannedRow(_ planned: MealPlan, slot: MealSlot) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Planned")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Palette.muted)
+                Text(planned.isEatingOut ? "Eating out" : planned.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            Button(planned.isEatingOut ? "Log it" : "Ate it") {
+                if planned.isEatingOut {
+                    draft = LogDraft(slot: slot, source: .out)
+                } else {
+                    let recipe = recipes.first { $0.name == planned.title }
+                    context.insert(FoodEntry(slot: slot, name: planned.title, source: .prepped,
+                                             calories: recipe?.caloriesPerServing,
+                                             protein: recipe?.proteinPerServing,
+                                             carbs: recipe?.carbsPerServing,
+                                             fat: recipe?.fatPerServing))
+                }
+            }
+            .font(.caption.weight(.heavy))
+            .foregroundStyle(Palette.onAccent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(planned.isEatingOut ? Palette.gym : Palette.food, in: Capsule())
+            .buttonStyle(.plain)
+        }
+        .padding(10)
+        .background(Palette.card2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.leading, 42)
+    }
+
+    private func entryRow(_ entry: FoodEntry) -> some View {
+        Button {
+            draft = LogDraft(slot: entry.slot, source: entry.source, name: entry.name, entry: entry)
+        } label: {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    HStack(spacing: 6) {
+                        sourceTag(entry.source)
+                        if let line = macroLine(entry) {
+                            Text(line)
+                                .font(.caption)
+                                .foregroundStyle(Palette.muted)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Palette.faint)
+            }
+            .padding(.leading, 42)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Edit", systemImage: "pencil") {
+                draft = LogDraft(slot: entry.slot, source: entry.source, name: entry.name, entry: entry)
+            }
+            Button("Log again", systemImage: "arrow.clockwise") {
+                context.insert(FoodEntry(slot: entry.slot, name: entry.name, source: entry.source,
+                                         calories: entry.calories, protein: entry.protein,
+                                         carbs: entry.carbs, fat: entry.fat))
+            }
+            Button("Delete", systemImage: "trash", role: .destructive) { context.delete(entry) }
+        }
+    }
+
+    private func macroLine(_ entry: FoodEntry) -> String? {
+        var parts: [String] = []
+        if let cal = entry.calories { parts.append("\(cal) cal") }
+        if let p = entry.protein { parts.append("\(p)g protein") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private func sourceTag(_ source: MealSource) -> some View {
-        Text(source.title.uppercased())
-            .font(.caption2.weight(.heavy))
+        Text(source.title)
+            .font(.caption2.weight(.bold))
             .foregroundStyle(source.isHome ? Palette.foodText : Palette.gymText)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(source.isHome ? Palette.foodTint : Palette.gymTint,
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background(source.isHome ? Palette.foodTint : Palette.gymTint, in: Capsule())
+    }
+
+    private func startLog(slot: MealSlot, source: MealSource) {
+        let planned = plan(for: slot)
+        let name = (planned != nil && planned?.isEatingOut == (source == .out)) ? (planned?.title ?? "") : ""
+        draft = LogDraft(slot: slot, source: source, name: name == MealPlan.eatOut ? "" : name)
     }
 
     private var prepCard: some View {
         let meals = recipes.reduce(0) { $0 + $1.servings }
-        return VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "Next prep block", color: Palette.foodText)
-            Text("Sunday · \(MySchedule.prepStart.label) – \(MySchedule.prepEnd.label)")
-                .font(.headline.weight(.heavy))
-                .foregroundStyle(Palette.ink)
-            Text(recipes.isEmpty
-                 ? "Add recipes in Plan & groceries to plan what you'll cook."
-                 : "Makes \(meals) meals from \(recipes.count) recipe\(recipes.count == 1 ? "" : "s"). It's on your Sunday timeline.")
-                .font(.footnote)
-                .foregroundStyle(Palette.ink)
+        return HStack(spacing: 14) {
+            Image(systemName: "frying.pan.fill")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(Palette.food)
+                .frame(width: 44, height: 44)
+                .background(Palette.card, in: Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                SectionLabel(text: "Next prep block", color: Palette.foodText)
+                Text("Sunday · \(MySchedule.prepStart.label) – \(MySchedule.prepEnd.label)")
+                    .font(.headline.weight(.heavy))
+                    .foregroundStyle(Palette.ink)
+                Text(recipes.isEmpty
+                     ? "Add recipes in Plan & groceries to plan what you'll cook."
+                     : "Makes \(meals) meals from \(recipes.count) recipe\(recipes.count == 1 ? "" : "s").")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.ink)
+            }
+            Spacer(minLength: 0)
         }
         .card(fill: Palette.foodTint)
     }
@@ -301,10 +421,11 @@ struct LogMealSheet: View {
     @State private var fat = ""
     @State private var estimating = false
     @State private var estimateNote: String?
+    @State private var showTime = false
+    @FocusState private var nameFocused: Bool
 
     private let entry: FoodEntry?
     @State private var time: Date
-    @State private var confirmDelete = false
 
     init(draft: LogDraft) {
         entry = draft.entry
@@ -320,6 +441,8 @@ struct LogMealSheet: View {
         }
     }
 
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespaces) }
+
     private func use(_ recipe: Recipe) {
         name = recipe.name
         calories = recipe.caloriesPerServing.map(String.init) ?? ""
@@ -331,15 +454,17 @@ struct LogMealSheet: View {
     private func estimate() {
         estimating = true
         estimateNote = nil
-        let description = name.trimmingCharacters(in: .whitespaces)
+        let description = trimmedName
         Task {
             do {
                 let result = try await RecipeAI.estimate(meal: description)
-                calories = String(Int(result.calories.rounded()))
-                protein = String(Int(result.protein.rounded()))
-                carbs = String(Int(result.carbs.rounded()))
-                fat = String(Int(result.fat.rounded()))
-                estimateNote = result.note
+                withAnimation(.snappy) {
+                    calories = String(Int(result.calories.rounded()))
+                    protein = String(Int(result.protein.rounded()))
+                    carbs = String(Int(result.carbs.rounded()))
+                    fat = String(Int(result.fat.rounded()))
+                    estimateNote = result.note
+                }
             } catch {
                 estimateNote = error.localizedDescription
             }
@@ -347,104 +472,166 @@ struct LogMealSheet: View {
         }
     }
 
-    private func numberRow(_ title: String, text: Binding<String>) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            TextField("—", text: text)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 90)
-        }
-    }
-
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField(source == .out ? "Where / what did you get?" : "What did you eat?", text: $name)
-                    Picker("Meal", selection: $slot) {
-                        ForEach(MealSlot.allCases) { s in Text(s.title).tag(s) }
-                    }
-                    Picker("Source", selection: $source) {
-                        ForEach(MealSource.allCases) { s in Text(s.title).tag(s) }
-                    }
-                    .pickerStyle(.segmented)
-                    if entry != nil {
-                        DatePicker("When", selection: $time)
-                    }
-                }
-                if source != .out && !recipes.isEmpty {
-                    Section("From your recipes") {
-                        ForEach(recipes) { recipe in
-                            Button {
-                                use(recipe)
-                            } label: {
-                                HStack {
-                                    Text(recipe.name).foregroundStyle(Palette.ink)
-                                    Spacer()
-                                    if let line = recipe.macroLine {
-                                        Text(line).font(.caption).foregroundStyle(Palette.muted)
-                                    }
+        DetailSheetLayout {
+            DetailHero(background: BlockCategory.food.hero, symbol: source.isHome ? "fork.knife" : "takeoutbag.and.cup.and.straw.fill",
+                       iconColor: source.isHome ? Palette.food : Palette.gym,
+                       timeText: slot.title + " · " + time.formatted(date: .omitted, time: .shortened),
+                       onClose: { dismiss() },
+                       trailing: {
+                           roundButton("checkmark", label: "Save", action: save)
+                               .disabled(trimmedName.isEmpty)
+                               .opacity(trimmedName.isEmpty ? 0.5 : 1)
+                       }, title: {
+                           TextField("", text: $name,
+                                     prompt: Text(source == .out ? "Where / what?" : "What did you eat?")
+                                        .foregroundStyle(Palette.heroOn.opacity(0.5)),
+                                     axis: .vertical)
+                               .lineLimit(1...3)
+                               .focused($nameFocused)
+                       })
+        } content: {
+            DetailCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    SectionLabel(text: "Meal")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(MealSlot.allCases) { s in
+                                ChoiceChip(title: s.title, symbol: s.symbol, isOn: slot == s, tint: Palette.food) {
+                                    slot = s
                                 }
                             }
                         }
                     }
                 }
-                Section {
-                    numberRow("Calories", text: $calories)
-                    numberRow("Protein (g)", text: $protein)
-                    numberRow("Carbs (g)", text: $carbs)
-                    numberRow("Fat (g)", text: $fat)
-                    Button {
-                        estimate()
-                    } label: {
-                        HStack {
-                            Text(estimating ? "Estimating…" : "Estimate from the description")
-                            Spacer()
-                            if estimating { ProgressView() }
+                .padding(.vertical, 14)
+                DetailDivider().padding(.leading, -44)
+                VStack(alignment: .leading, spacing: 10) {
+                    SectionLabel(text: "Where from")
+                    HStack(spacing: 8) {
+                        ForEach(MealSource.allCases) { s in
+                            ChoiceChip(title: s.title, isOn: source == s, tint: s.isHome ? Palette.food : Palette.gym) {
+                                source = s
+                            }
                         }
                     }
-                    .disabled(estimating || name.trimmingCharacters(in: .whitespaces).isEmpty)
-                    if let estimateNote {
-                        Text(estimateNote).font(.footnote).foregroundStyle(Palette.muted)
-                    }
-                } header: {
-                    Text("Nutrition (optional)")
-                } footer: {
-                    Text("Be specific for better estimates, e.g. \"Chipotle chicken bowl, white rice, black beans, guac\".")
                 }
-                if let entry {
-                    Section {
-                        Button("Delete this meal", role: .destructive) {
-                            context.delete(entry)
-                            dismiss()
-                        }
-                    }
+                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                DetailDivider().padding(.leading, -44)
+                DetailExpandableRow(symbol: "clock.fill", tint: Palette.food,
+                                    title: time.formatted(date: .abbreviated, time: .shortened),
+                                    value: Calendar.current.isDateInToday(time) ? "Today" : nil,
+                                    expanded: $showTime) {
+                    DatePicker("When", selection: $time)
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                        .frame(maxWidth: .infinity)
                 }
             }
-            .navigationTitle(entry == nil ? "Log meal" : "Edit meal")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+
+            if source != .out && !recipes.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    SectionLabel(text: "From your recipes")
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(recipes) { recipe in
+                                ChoiceChip(title: recipe.name, isOn: name == recipe.name, tint: Palette.food) {
+                                    withAnimation(.snappy) { use(recipe) }
+                                }
+                            }
+                        }
+                    }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(Palette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            }
+
+            nutritionCard
+
+            if let entry {
+                DetailDeleteButton(title: "Delete this meal") {
+                    context.delete(entry)
+                    dismiss()
                 }
+            } else {
+                DetailPrimaryButton(title: "Log " + slot.title.lowercased(), symbol: "plus", fill: Palette.food, action: save)
+                    .disabled(trimmedName.isEmpty)
+                    .opacity(trimmedName.isEmpty ? 0.5 : 1)
             }
         }
-        .presentationDetents([.medium, .large])
         .onAppear {
             if entry == nil, calories.isEmpty, let match = recipes.first(where: { $0.name == name }) {
                 use(match)
             }
+            if entry == nil && name.isEmpty { nameFocused = true }
         }
     }
 
+    private var nutritionCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SectionLabel(text: "Nutrition")
+                Spacer()
+                Button {
+                    estimate()
+                } label: {
+                    HStack(spacing: 6) {
+                        if estimating {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "sparkles")
+                        }
+                        Text(estimating ? "Estimating…" : "Estimate")
+                    }
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.foodText)
+                    .padding(.horizontal, 12)
+                    .frame(height: 30)
+                    .background(Palette.foodTint, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(estimating || trimmedName.isEmpty)
+                .opacity(trimmedName.isEmpty ? 0.5 : 1)
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                macroField("Calories", unit: "cal", text: $calories)
+                macroField("Protein", unit: "g", text: $protein)
+                macroField("Carbs", unit: "g", text: $carbs)
+                macroField("Fat", unit: "g", text: $fat)
+            }
+            Text(estimateNote ?? "Describe it specifically for a better estimate, e.g. \"chicken burrito bowl, white rice, black beans, guac\".")
+                .font(.footnote)
+                .foregroundStyle(Palette.muted)
+        }
+        .padding(16)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private func macroField(_ title: String, unit: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Palette.muted)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                TextField("—", text: text)
+                    .keyboardType(.numberPad)
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(Palette.ink)
+                Text(unit)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Palette.muted)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.card2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     private func save() {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        let trimmed = trimmedName
+        guard !trimmed.isEmpty else { return }
         if let entry {
             entry.name = trimmed
             entry.slotRaw = slot.rawValue
@@ -455,7 +642,7 @@ struct LogMealSheet: View {
             entry.carbs = Int(carbs)
             entry.fat = Int(fat)
         } else {
-            context.insert(FoodEntry(slot: slot, name: trimmed, source: source,
+            context.insert(FoodEntry(date: time, slot: slot, name: trimmed, source: source,
                                      calories: Int(calories), protein: Int(protein),
                                      carbs: Int(carbs), fat: Int(fat)))
         }

@@ -429,7 +429,7 @@ struct TodayView: View {
                     .onTapGesture {
                         if let id = block.eventID {
                             editingEvent = events.first { $0.id == id }
-                        } else if block.routineType != nil {
+                        } else {
                             stepEdit = StepDayEdit(block: block, day: selectedDay)
                         }
                     }

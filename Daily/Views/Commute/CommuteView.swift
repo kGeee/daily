@@ -20,15 +20,10 @@ struct CommuteView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     header(now: tl.date)
                     if let type = planner.type(for: today) {
-                        Picker("Day type", selection: Binding(
+                        PillSegment(DayType.allCases, selection: Binding(
                             get: { type },
                             set: { setType($0, on: today) }
-                        )) {
-                            ForEach(DayType.allCases) { t in
-                                Text(t.short).tag(t)
-                            }
-                        }
-                        .pickerStyle(.segmented)
+                        )) { $0.short }
                     }
                     nextCard(now: tl.date)
                     LiveTrainsCard(planner: planner)

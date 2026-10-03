@@ -58,6 +58,21 @@ enum Palette {
 
     static let work = Color(light: 0x6B717D, dark: 0x9AA0AB)
 
+    static let danger = Color(light: 0xD23B3B, dark: 0xFF6B6B)
+
+    // Detail-sheet headers: a muted, deeper version of each category color, with light text on top.
+    static let heroCommute = Color(light: 0x4C6FAE, dark: 0x2B4271)
+    static let heroGym = Color(light: 0xAE6941, dark: 0x6A3B22)
+    static let heroFood = Color(light: 0x4E8763, dark: 0x2B4F38)
+    static let heroSleep = Color(light: 0x5B708C, dark: 0x34435A)
+    static let heroWork = Color(light: 0x69707D, dark: 0x3C414B)
+    static let heroGeneral = Color(light: 0xA45C7F, dark: 0x66344D)
+    static let heroFocus = Color(light: 0xAE564C, dark: 0x6B302A)
+    /// Text and icons on a hero header.
+    static let heroOn = Color(light: 0xFFFFFF, dark: 0xF2F3F5)
+    /// The big icon capsule and round buttons on a hero header.
+    static let heroPill = Color(light: 0xF4F5F7, dark: 0x22252B)
+
     static let focus = Color(light: 0xC9433A, dark: 0xF26B5B)
     static let focusTint = Color(light: 0xFBE9E7, dark: 0x3A1E1B)
     static let focusText = Color(light: 0xA8362E, dark: 0xF7A097)

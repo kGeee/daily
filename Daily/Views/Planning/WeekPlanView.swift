@@ -39,11 +39,7 @@ struct WeekPlanView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Picker("Week", selection: $weekOffset) {
-                        Text("This week").tag(0)
-                        Text("Next week").tag(1)
-                    }
-                    .pickerStyle(.segmented)
+                    PillSegment([0, 1], selection: $weekOffset) { $0 == 0 ? "This week" : "Next week" }
 
                     Button {
                         showAIPlanner = true

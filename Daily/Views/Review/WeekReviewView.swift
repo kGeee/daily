@@ -102,11 +102,7 @@ struct WeekReviewView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Picker("Week", selection: $weeksBack) {
-                        Text("This week").tag(0)
-                        Text("Last week").tag(1)
-                    }
-                    .pickerStyle(.segmented)
+                    PillSegment([0, 1], selection: $weeksBack) { $0 == 0 ? "This week" : "Last week" }
 
                     if let week = interval(weeksBack: weeksBack) {
                         let s = stats(for: week)

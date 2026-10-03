@@ -22,11 +22,7 @@ struct GroceriesSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Picker("Trip", selection: $trip) {
-                Text("Trip 1 · Sun").tag(1)
-                Text("Trip 2 · Wed").tag(2)
-            }
-            .pickerStyle(.segmented)
+            PillSegment([1, 2], selection: $trip) { $0 == 1 ? "Trip 1 · Sun" : "Trip 2 · Wed" }
 
             Button {
                 showWeekPlan = true
@@ -67,82 +63,113 @@ struct GroceriesSection: View {
     // MARK: Recipes
 
     private var recipesRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(text: "This week's recipes")
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(recipes) { recipe in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(recipe.name)
-                                .font(.subheadline.weight(.heavy))
-                                .foregroundStyle(Palette.ink)
-                                .lineLimit(2)
-                            Text("\(recipe.servings) \(recipe.slot.rawValue)\(recipe.servings == 1 ? "" : "s")")
-                                .font(.caption)
-                                .foregroundStyle(Palette.muted)
-                            if !recipe.note.isEmpty {
-                                Text(recipe.note)
-                                    .font(.caption2.weight(.bold))
-                                    .foregroundStyle(Palette.foodText)
-                                    .padding(.top, 4)
-                            }
-                            Text(recipe.macroLine ?? (recipe.ingredients.isEmpty ? "No ingredients yet" : "\(recipe.ingredients.count) ingredients"))
-                                .font(.caption2)
-                                .foregroundStyle(Palette.faint)
-                        }
-                        .frame(width: 120, alignment: .leading)
-                        .padding(12)
-                        .background(Palette.card, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        .contentShape(Rectangle())
-                        .onTapGesture { viewingRecipe = recipe }
-                        .contextMenu {
-                            Button("Open") { viewingRecipe = recipe }
-                            Button("Edit") { editingRecipe = recipe }
-                            Button("Add ingredients to this trip") { addIngredients(of: recipe) }
-                            Button("Delete", role: .destructive) { context.delete(recipe) }
-                        }
-                    }
-                    Button {
-                        showAddRecipe = true
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("+ New recipe")
-                                .font(.subheadline.weight(.heavy))
-                                .foregroundStyle(Palette.ink)
-                            Text("Pick ones that reheat well")
-                                .font(.caption)
-                                .foregroundStyle(Palette.muted)
-                        }
-                        .frame(width: 120, alignment: .leading)
-                        .padding(12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(Palette.faint, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    Button {
-                        showImport = true
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Label("Import", systemImage: "square.and.arrow.down")
-                                .font(.subheadline.weight(.heavy))
-                                .foregroundStyle(Palette.ink)
-                            Text("From an Instagram reel or any recipe text")
-                                .font(.caption)
-                                .foregroundStyle(Palette.muted)
-                        }
-                        .frame(width: 120, alignment: .leading)
-                        .padding(12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(Palette.faint, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                        )
-                    }
-                    .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                SectionLabel(text: "This week's recipes")
+                Spacer()
+                if !recipes.isEmpty {
+                    Text("\(recipes.reduce(0) { $0 + $1.servings }) meals")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Palette.foodText)
                 }
             }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(recipes) { recipe in
+                        recipeCard(recipe)
+                    }
+                    addCard(title: "New recipe", symbol: "plus", subtitle: "Pick ones that reheat well") {
+                        showAddRecipe = true
+                    }
+                    addCard(title: "Import", symbol: "square.and.arrow.down",
+                            subtitle: "From an Instagram reel, screenshot or text") {
+                        showImport = true
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.viewAligned)
+            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .padding(.horizontal, -16)
         }
+    }
+
+    private static let recipeCardSize = CGSize(width: 168, height: 158)
+
+    private func recipeCard(_ recipe: Recipe) -> some View {
+        Button {
+            viewingRecipe = recipe
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: recipe.slot.symbol)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Palette.food)
+                        .frame(width: 24, height: 24)
+                        .background(Palette.foodTint, in: Circle())
+                    Text("\(recipe.servings) \(recipe.slot.rawValue)\(recipe.servings == 1 ? "" : "s")")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Palette.muted)
+                }
+                Text(recipe.name)
+                    .font(.subheadline.weight(.heavy))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                if !recipe.note.isEmpty {
+                    Text(recipe.note)
+                        .font(.caption)
+                        .foregroundStyle(Palette.foodText)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                Text(recipe.macroLine ?? (recipe.ingredients.isEmpty ? "No ingredients yet" : "\(recipe.ingredients.count) ingredients"))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Palette.faint)
+                    .lineLimit(1)
+            }
+            .padding(14)
+            .frame(width: Self.recipeCardSize.width, height: Self.recipeCardSize.height, alignment: .topLeading)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Open", systemImage: "book") { viewingRecipe = recipe }
+            Button("Edit", systemImage: "pencil") { editingRecipe = recipe }
+            Button("Add ingredients to this trip", systemImage: "cart.badge.plus") { addIngredients(of: recipe) }
+            Button("Delete", systemImage: "trash", role: .destructive) { context.delete(recipe) }
+        }
+    }
+
+    private func addCard(title: String, symbol: String, subtitle: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Palette.foodText)
+                    .frame(width: 32, height: 32)
+                    .background(Palette.foodTint, in: Circle())
+                Spacer(minLength: 0)
+                Text(title)
+                    .font(.subheadline.weight(.heavy))
+                    .foregroundStyle(Palette.ink)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(Palette.muted)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+            }
+            .padding(14)
+            .frame(width: Self.recipeCardSize.width * 0.8, height: Self.recipeCardSize.height, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(Palette.faint.opacity(0.6), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: List
@@ -161,29 +188,43 @@ struct GroceriesSection: View {
 
             HStack(spacing: 8) {
                 TextField("Add item", text: $newName)
+                    .submitLabel(.done)
                     .onSubmit(addItem)
                 TextField("Qty", text: $newQuantity)
-                    .frame(width: 56)
+                    .frame(width: 50)
+                    .foregroundStyle(Palette.muted)
                 Menu {
                     ForEach(Self.sections, id: \.self) { s in
                         Button(s) { newSection = s }
                     }
                 } label: {
-                    Text(newSection)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Palette.foodText)
+                    HStack(spacing: 3) {
+                        Text(newSection)
+                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .bold))
+                    }
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.foodText)
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .background(Palette.foodTint, in: Capsule())
                 }
                 Button(action: addItem) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(Palette.food)
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .heavy))
+                        .foregroundStyle(Palette.onAccent)
+                        .frame(width: 30, height: 30)
+                        .background(Palette.food, in: Circle())
                 }
+                .buttonStyle(.plain)
                 .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                .opacity(newName.trimmingCharacters(in: .whitespaces).isEmpty ? 0.45 : 1)
                 .accessibilityLabel("Add item")
             }
             .font(.subheadline)
-            .padding(10)
-            .background(Palette.card2, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .padding(.leading, 14)
+            .padding(.trailing, 8)
+            .frame(height: 48)
+            .background(Palette.card2, in: Capsule())
 
             if tripItems.isEmpty {
                 Text("Nothing on this trip's list yet.")
@@ -244,7 +285,7 @@ struct GroceryRow: View {
 
     var body: some View {
         Button {
-            item.isDone.toggle()
+            withAnimation(.snappy(duration: 0.2)) { item.isDone.toggle() }
         } label: {
             HStack(spacing: 12) {
                 ZStack {
@@ -261,21 +302,29 @@ struct GroceryRow: View {
                     }
                 }
                 .frame(width: 22, height: 22)
-                Text(item.name)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(item.isDone ? Palette.faint : Palette.ink)
-                    .strikethrough(item.isDone)
-                Spacer()
-                Text(item.quantity)
-                    .font(.caption)
-                    .foregroundStyle(Palette.muted)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(item.isDone ? Palette.faint : Palette.ink)
+                        .strikethrough(item.isDone)
+                        .lineLimit(2)
+                    if !item.quantity.isEmpty {
+                        Text(item.quantity)
+                            .font(.caption)
+                            .foregroundStyle(Palette.muted)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
             }
-            .frame(minHeight: 40)
+            .frame(minHeight: 44)
+            .animation(.snappy(duration: 0.2), value: item.isDone)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.selection, trigger: item.isDone)
         .contextMenu {
-            Button("Delete", role: .destructive) { context.delete(item) }
+            Button("Delete", systemImage: "trash", role: .destructive) { context.delete(item) }
         }
     }
 }

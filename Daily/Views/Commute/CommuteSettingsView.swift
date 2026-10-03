@@ -482,75 +482,15 @@ struct StepDayEdit: Identifiable {
     var id: String { block.id + DayKey.of(day) }
 }
 
+/// One-day changes to a routine step: opens the shared block detail sheet.
 struct StepDayEditor: View {
-    @Environment(\.dismiss) private var dismiss
     let edit: StepDayEdit
-    @State private var time: Date
-    @State private var showRoutine = false
 
     init(edit: StepDayEdit) {
         self.edit = edit
-        _time = State(initialValue: edit.block.start)
     }
-
-    private var dayKey: String { DayKey.of(edit.day) }
-    private var hasOverride: Bool { Routines.overrides(for: dayKey)[edit.block.id] != nil }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
-                    Button("Save for " + dayLabel) {
-                        let parts = Calendar.current.dateComponents([.hour, .minute], from: time)
-                        let minutes = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
-                        Routines.setOverride(StepOverride(time: minutes), step: edit.block.id, dayKey: dayKey)
-                        Pref.bump()
-                        dismiss()
-                    }
-                } header: {
-                    Text(edit.block.title)
-                } footer: {
-                    Text("Later steps that follow this one (like \"next train after\") move with it.")
-                }
-
-                Section {
-                    Button("Skip it " + dayLabel, role: .destructive) {
-                        Routines.setOverride(StepOverride(skipped: true), step: edit.block.id, dayKey: dayKey)
-                        Pref.bump()
-                        dismiss()
-                    }
-                    if hasOverride {
-                        Button("Back to the usual") {
-                            Routines.setOverride(nil, step: edit.block.id, dayKey: dayKey)
-                            Pref.bump()
-                            dismiss()
-                        }
-                    }
-                }
-
-                if let type = edit.block.routineType {
-                    Section {
-                        NavigationLink("Change the \(type.title) routine") {
-                            RoutineEditorView(type: type)
-                        }
-                    } footer: {
-                        Text("For changes every time, not just " + dayLabel + ".")
-                    }
-                }
-            }
-            .navigationTitle("Change " + dayLabel)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private var dayLabel: String {
-        Calendar.current.isDateInToday(edit.day) ? "today" : edit.day.formatted(.dateTime.weekday(.wide))
+        BlockDetailSheet(block: edit.block, day: edit.day)
     }
 }
