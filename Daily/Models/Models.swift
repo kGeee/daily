@@ -30,6 +30,8 @@ final class FoodEntry {
     var protein: Int?
     var carbs: Int? = nil
     var fat: Int? = nil
+    /// Set for meals eaten out at a saved restaurant (these are its visits).
+    var restaurantID: UUID? = nil
 
     init(date: Date = .now, slot: MealSlot, name: String, source: MealSource,
          calories: Int? = nil, protein: Int? = nil, carbs: Int? = nil, fat: Int? = nil) {

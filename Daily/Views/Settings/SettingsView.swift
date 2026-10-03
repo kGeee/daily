@@ -108,6 +108,7 @@ struct SettingsView: View {
 
     @AppStorage(Pref.revision) private var revision = 0
     @State private var apiKey = Keychain.read() ?? ""
+    @State private var yelpKey = Keychain.read(PlaceSearch.yelpAccount) ?? ""
 
     var body: some View {
         NavigationStack {
@@ -186,6 +187,22 @@ struct SettingsView: View {
                     Text("AI (optional)")
                 } footer: {
                     Text("Used to import recipes from Instagram, estimate calories and macros, and plan meal prep. Stored in your iPhone's Keychain and sent only to Anthropic. Usage is billed to your Anthropic account.")
+                }
+
+                Section {
+                    SecureField("Yelp API key", text: $yelpKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onChange(of: yelpKey) { _, newValue in
+                            Keychain.save(newValue, account: PlaceSearch.yelpAccount)
+                        }
+                    if let url = URL(string: "https://www.yelp.com/developers/v3/manage_app") {
+                        Link("Get a Yelp key", destination: url)
+                    }
+                } header: {
+                    Text("Restaurant ratings (optional)")
+                } footer: {
+                    Text("Restaurant search uses Apple Maps and works without this. With a Yelp key you also see Yelp star ratings, review counts and prices. Yelp charges for its API after a trial, so this is entirely optional.")
                 }
 
                 Section {

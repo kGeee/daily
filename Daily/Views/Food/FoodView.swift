@@ -4,7 +4,8 @@ import SwiftData
 struct FoodView: View {
     enum Tab: String, CaseIterable, Identifiable {
         case today = "Today"
-        case plan = "Plan & groceries"
+        case plan = "Groceries"
+        case places = "Restaurants"
         var id: String { rawValue }
     }
 
@@ -33,11 +34,15 @@ struct FoodView: View {
                 PillSegment(Tab.allCases, selection: $tab) { $0.rawValue }
 
                 ZStack(alignment: .top) {
-                    if tab == .today {
+                    switch tab {
+                    case .today:
                         FoodTodaySection()
                             .transition(.opacity.combined(with: .move(edge: .leading)))
-                    } else {
+                    case .plan:
                         GroceriesSection()
+                            .transition(.opacity)
+                    case .places:
+                        RestaurantsSection()
                             .transition(.opacity.combined(with: .move(edge: .trailing)))
                     }
                 }
@@ -75,6 +80,8 @@ struct LogDraft: Identifiable {
     var name: String = ""
     /// Set when editing something already logged.
     var entry: FoodEntry? = nil
+    /// A saved restaurant this meal was at.
+    var restaurantID: UUID? = nil
 }
 
 struct FoodTodaySection: View {
@@ -396,7 +403,7 @@ struct FoodTodaySection: View {
                     .font(.headline.weight(.heavy))
                     .foregroundStyle(Palette.ink)
                 Text(recipes.isEmpty
-                     ? "Add recipes in Plan & groceries to plan what you'll cook."
+                     ? "Add recipes in Groceries to plan what you'll cook."
                      : "Makes \(meals) meals from \(recipes.count) recipe\(recipes.count == 1 ? "" : "s").")
                     .font(.footnote)
                     .foregroundStyle(Palette.ink)
@@ -411,6 +418,10 @@ struct LogMealSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Query(sort: \Recipe.createdAt) private var recipes: [Recipe]
+    @Query(sort: \Restaurant.createdAt) private var restaurants: [Restaurant]
+    @Query(sort: \FoodEntry.date, order: .reverse) private var allEntries: [FoodEntry]
+    @State private var restaurantID: UUID?
+    @State private var findingPlace = false
 
     @State private var name = ""
     @State private var slot: MealSlot
@@ -433,6 +444,7 @@ struct LogMealSheet: View {
         _slot = State(initialValue: draft.slot)
         _source = State(initialValue: draft.source)
         _time = State(initialValue: draft.entry?.date ?? Date())
+        _restaurantID = State(initialValue: draft.entry?.restaurantID ?? draft.restaurantID)
         if let e = draft.entry {
             _calories = State(initialValue: e.calories.map(String.init) ?? "")
             _protein = State(initialValue: e.protein.map(String.init) ?? "")
@@ -528,6 +540,10 @@ struct LogMealSheet: View {
                         .labelsHidden()
                         .frame(maxWidth: .infinity)
                 }
+            }
+
+            if source == .out {
+                placeCard
             }
 
             if source != .out && !recipes.isEmpty {
@@ -641,12 +657,78 @@ struct LogMealSheet: View {
             entry.protein = Int(protein)
             entry.carbs = Int(carbs)
             entry.fat = Int(fat)
+            entry.restaurantID = source == .out ? restaurantID : nil
         } else {
-            context.insert(FoodEntry(date: time, slot: slot, name: trimmed, source: source,
-                                     calories: Int(calories), protein: Int(protein),
-                                     carbs: Int(carbs), fat: Int(fat)))
+            let new = FoodEntry(date: time, slot: slot, name: trimmed, source: source,
+                                calories: Int(calories), protein: Int(protein),
+                                carbs: Int(carbs), fat: Int(fat))
+            new.restaurantID = source == .out ? restaurantID : nil
+            context.insert(new)
         }
         dismiss()
+    }
+
+    // MARK: Where you ate
+
+    /// Places you've been, most recent first, then the rest.
+    private var recentPlaces: [Restaurant] {
+        var seen = Set<UUID>()
+        var ordered: [Restaurant] = []
+        for e in allEntries {
+            if let id = e.restaurantID, !seen.contains(id), let r = restaurants.first(where: { $0.id == id }) {
+                seen.insert(id)
+                ordered.append(r)
+            }
+        }
+        for r in restaurants.reversed() where !seen.contains(r.id) && !r.wantToTry { ordered.append(r) }
+        if let id = restaurantID, let chosen = restaurants.first(where: { $0.id == id }) {
+            ordered.removeAll { $0.id == id }
+            ordered.insert(chosen, at: 0)
+        }
+        return Array(ordered.prefix(10))
+    }
+
+    private func choosePlace(_ r: Restaurant) {
+        let previous = restaurants.first { $0.id == restaurantID }?.name
+        if restaurantID == r.id {
+            restaurantID = nil
+            return
+        }
+        restaurantID = r.id
+        if trimmedName.isEmpty || trimmedName == previous { name = r.name }
+    }
+
+    private var placeCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Restaurant")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ChoiceChip(title: "Find a place", symbol: "magnifyingglass", isOn: false, tint: Palette.gym) {
+                        findingPlace = true
+                    }
+                    ForEach(recentPlaces) { r in
+                        ChoiceChip(title: r.name, isOn: restaurantID == r.id, tint: Palette.gym) {
+                            withAnimation(.snappy) { choosePlace(r) }
+                        }
+                    }
+                }
+            }
+            Text(restaurantID == nil
+                 ? "Link it to a place to build your restaurant list."
+                 : "Counts as a visit. Rank the place from Food → Restaurants.")
+                .font(.footnote)
+                .foregroundStyle(Palette.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .sheet(isPresented: $findingPlace) {
+            RestaurantSearchSheet(title: "Where did you eat?") { place in
+                let r = RestaurantStore.findOrCreate(place, in: restaurants, context: context)
+                restaurantID = nil
+                choosePlace(r)
+            }
+        }
     }
 }
 

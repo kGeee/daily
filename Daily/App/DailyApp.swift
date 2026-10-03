@@ -19,7 +19,8 @@ struct DailyApp: App {
             WorkoutTemplate.self,
             WorkoutSession.self,
             SetLog.self,
-            FocusSession.self
+            FocusSession.self,
+            Restaurant.self
         ])
     }
 }

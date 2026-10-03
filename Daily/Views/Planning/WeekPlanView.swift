@@ -141,7 +141,7 @@ struct WeekPlanView: View {
                         .foregroundStyle(Palette.foodText)
                 }
             } else {
-                Text("Pick lunches and dinners below. Add recipes in Food → Plan & groceries.")
+                Text("Pick lunches and dinners below. Add recipes in Food → Groceries.")
                     .font(.caption)
                     .foregroundStyle(Palette.muted)
             }
