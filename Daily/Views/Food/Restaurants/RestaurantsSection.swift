@@ -239,6 +239,13 @@ struct RestaurantsSection: View {
         }
     }
 
+    private static func rowSubtitle(_ r: Restaurant, visits: Int) -> String {
+        var parts: [String] = []
+        if !r.subtitle.isEmpty { parts.append(r.subtitle) }
+        if visits == 1 { parts.append("1 visit") } else if visits > 1 { parts.append("\(visits) visits") }
+        return parts.joined(separator: " · ")
+    }
+
     private func rowLabel(_ r: Restaurant, rank: Int?, score: Double?, visits: Int) -> some View {
         HStack(spacing: 12) {
             Text(rank.map { "\($0)" } ?? "–")
@@ -250,8 +257,7 @@ struct RestaurantsSection: View {
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
-                Text([r.subtitle, visits > 0 ? "\(visits) visit\(visits == 1 ? "" : "s")" : ""]
-                        .filter { !$0.isEmpty }.joined(separator: " · "))
+                Text(Self.rowSubtitle(r, visits: visits))
                     .font(.caption)
                     .foregroundStyle(Palette.muted)
                     .lineLimit(1)

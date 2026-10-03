@@ -173,13 +173,19 @@ struct AIPrepPlannerView: View {
         return day.formatted(.dateTime.weekday(.abbreviated))
     }
 
+    private static func describe(_ r: Recipe) -> String {
+        var line = "- " + r.name + ": makes " + r.amountLabel(Double(r.servings))
+        line += " (\(r.mealCount) meals)"
+        if let macros = r.macroLine { line += ", " + macros + " per " + r.unitLabel(for: 1) }
+        if !r.note.isEmpty { line += ", " + r.note }
+        return line
+    }
+
     private func run() {
         working = true
         errorText = nil
         let slotList = openSlots.map { "\(DayKey.of($0.day)) (\($0.day.formatted(.dateTime.weekday(.wide)))) \($0.slot.rawValue)" }
-        let saved = reuse ? recipes.map { r in
-            "- \(r.name): makes \(r.amountLabel(Double(r.servings))) (\(r.mealCount) meals)" + (r.macroLine.map { ", \($0) per \(r.unitLabel(for: 1))" } ?? "") + (r.note.isEmpty ? "" : ", \(r.note)")
-        }.joined(separator: "\n") : ""
+        let saved = reuse ? recipes.map(Self.describe).joined(separator: "\n") : ""
         let prompt = """
         Plan a Sunday meal prep for one person who works an office job, goes to the gym 2-3 times a week, \
         and wants to eat out less. Meals must reheat well (packed lunches, microwave dinners).

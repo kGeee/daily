@@ -469,6 +469,16 @@ struct RestaurantDetailSheet: View {
         }
     }
 
+    private static func rankLine(position: Int, count: Int, feeling: RestaurantFeeling) -> String {
+        let group: String
+        switch feeling {
+        case .loved: group = "you liked"
+        case .fine: group = "that were fine"
+        case .disliked: group = "you didn't like"
+        }
+        return "#\(position) of \(count) " + group
+    }
+
     private var scoreCard: some View {
         let score = RestaurantRanking.scores(restaurants)[restaurant.id]
         let feeling = restaurant.feeling
@@ -478,7 +488,7 @@ struct RestaurantDetailSheet: View {
             ScoreBadge(score: score, feeling: feeling, size: 64)
             VStack(alignment: .leading, spacing: 4) {
                 if let feeling {
-                    Text("#\(position) of \(group.count) \(feeling == .loved ? "you liked" : feeling == .fine ? "that were fine" : "you didn't like")")
+                    Text(Self.rankLine(position: position, count: group.count, feeling: feeling))
                         .font(.headline)
                         .foregroundStyle(Palette.ink)
                 } else {

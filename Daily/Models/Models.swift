@@ -139,6 +139,24 @@ final class Recipe {
         return (scale(caloriesPerServing), scale(proteinPerServing), scale(carbsPerServing), scale(fatPerServing))
     }
 
+    /// "Makes 30 nuggets (5 meals) · Dinner · Reheats well".
+    var makesLine: String {
+        var parts: [String] = []
+        var makes = "Makes " + amountLabel(Double(servings))
+        if hasCustomUnit { makes += " (\(mealCount) meals)" }
+        parts.append(makes)
+        parts.append(slot.title)
+        if !note.isEmpty { parts.append(note) }
+        return parts.joined(separator: " · ")
+    }
+
+    /// "30 nuggets · 5 dinners" or "4 dinners", for recipe cards.
+    var cardLine: String {
+        let meals = "\(mealCount) \(slot.rawValue)" + (mealCount == 1 ? "" : "s")
+        guard hasCustomUnit else { return meals }
+        return amountLabel(Double(servings)) + " · " + meals
+    }
+
     /// "8 nuggets", "1.5 servings".
     func amountLabel(_ amount: Double) -> String {
         let number = amount == amount.rounded() ? String(Int(amount)) : String(format: "%.1f", amount)

@@ -307,8 +307,10 @@ struct FoodTodaySection: View {
                     let recipe = recipes.first { $0.name == planned.title }
                     let amount = recipe?.unitsPerMeal ?? 1
                     let n = recipe?.nutrition(for: amount)
-                    let title = recipe.map { $0.hasCustomUnit ? "\(planned.title) (\($0.amountLabel(amount)))" : planned.title }
-                        ?? planned.title
+                    var title = planned.title
+                    if let recipe, recipe.hasCustomUnit {
+                        title += " (" + recipe.amountLabel(amount) + ")"
+                    }
                     context.insert(FoodEntry(slot: slot, name: title, source: .prepped,
                                              calories: n?.calories, protein: n?.protein,
                                              carbs: n?.carbs, fat: n?.fat))

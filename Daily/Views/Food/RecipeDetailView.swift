@@ -20,9 +20,7 @@ struct RecipeDetailView: View {
                         Text(recipe.name)
                             .font(.system(size: 28, weight: .heavy))
                             .foregroundStyle(Palette.ink)
-                        Text("Makes \(recipe.amountLabel(Double(recipe.servings)))"
-                             + (recipe.hasCustomUnit ? " (\(recipe.mealCount) meals)" : "")
-                             + " · \(recipe.slot.title)" + (recipe.note.isEmpty ? "" : " · " + recipe.note))
+                        Text(recipe.makesLine)
                             .font(.subheadline)
                             .foregroundStyle(Palette.muted)
                     }
