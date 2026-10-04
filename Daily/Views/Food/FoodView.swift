@@ -90,6 +90,12 @@ struct FoodTodaySection: View {
     @Query(sort: \Recipe.createdAt) private var recipes: [Recipe]
     @Query private var plans: [MealPlan]
     @State private var draft: LogDraft?
+    @Query(sort: \WorkoutSession.date, order: .reverse) private var workouts: [WorkoutSession]
+
+    private var burnedToday: Int {
+        workouts.filter { $0.finishedAt != nil && Calendar.current.isDateInToday($0.date) }
+            .reduce(0) { $0 + Burn.calories(for: $1) }
+    }
 
     private func plan(for slot: MealSlot) -> MealPlan? {
         let key = DayKey.of(Date())
@@ -162,6 +168,11 @@ struct FoodTodaySection: View {
                 Text(left >= 0 ? "\(left.formatted()) cal left" : "\((-left).formatted()) cal over")
                     .font(.caption.weight(.bold))
                     .foregroundStyle(left >= 0 ? Palette.foodText : Palette.gymText)
+                if burnedToday > 0 {
+                    Label("\(burnedToday) burned at the gym", systemImage: "flame.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Palette.gymText)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }

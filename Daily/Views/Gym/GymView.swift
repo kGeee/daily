@@ -9,6 +9,8 @@ struct GymView: View {
 
     @State private var editing: WorkoutTemplate?
     @State private var showNewTemplate = false
+    @State private var showCoach = false
+    @State private var finished: WorkoutSession?
 
     private var active: WorkoutSession? { sessions.first { $0.finishedAt == nil } }
     private var upNext: String? { WorkoutTemplate.nextName(templates: templates, sessions: sessions) }
@@ -16,7 +18,7 @@ struct GymView: View {
     var body: some View {
         Group {
             if let active {
-                ActiveWorkoutView(session: active)
+                ActiveWorkoutView(session: active) { done in finished = done }
             } else {
                 home
             }
@@ -28,6 +30,12 @@ struct GymView: View {
         .sheet(isPresented: $showNewTemplate) {
             TemplateEditor(template: nil)
         }
+        .sheet(isPresented: $showCoach) {
+            CoachSheet()
+        }
+        .sheet(item: $finished) { session in
+            WorkoutSummarySheet(session: session)
+        }
     }
 
     // MARK: Home
@@ -35,7 +43,26 @@ struct GymView: View {
     private var home: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ScreenHeader(eyebrow: upNext.map { "Up next · \($0)" } ?? "Gym", title: "Gym")
+                HStack(alignment: .bottom) {
+                    ScreenHeader(eyebrow: upNext.map { "Up next · \($0)" } ?? "Gym", title: "Gym")
+                    Spacer()
+                    Button {
+                        showCoach = true
+                    } label: {
+                        Label("Ask coach", systemImage: "bubble.left.and.text.bubble.right.fill")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(Palette.gymText)
+                            .padding(.horizontal, 12)
+                            .frame(height: 34)
+                            .background(Palette.gymTint, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                weekCard
+                if let next = templates.first(where: { $0.name == upNext }) {
+                    coachCard(next)
+                }
 
                 SectionLabel(text: "Start a workout")
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
@@ -144,7 +171,7 @@ struct GymView: View {
                         Text("\(doneSets) sets")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(Palette.ink)
-                        Text(session.cardioMinutes > 0 ? "\(minutes) min · \(session.cardioMinutes) cardio" : "\(minutes) min")
+                        Text("\(minutes) min · \(Burn.calories(for: session)) cal")
                             .font(.caption)
                             .foregroundStyle(Palette.muted)
                     }
@@ -159,6 +186,106 @@ struct GymView: View {
             }
         }
         .card()
+    }
+
+    // MARK: Week and coach
+
+    private var weekCard: some View {
+        let week = GymWeek.make(sessions: sessions, now: Date())
+        let maxCalories = max(week.daily.map(\.calories).max() ?? 0, 1)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 0) {
+                weekStat("\(week.workouts)", "workouts", color: Palette.ink)
+                weekStat(week.calories.formatted(), "cal burned", color: Palette.gymText, symbol: "flame.fill")
+                weekStat(week.volume >= 1000 ? String(format: "%.1fk", week.volume / 1000) : "\(Int(week.volume))",
+                         "lb moved", color: Palette.ink)
+            }
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach(week.daily, id: \.day) { entry in
+                    VStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(entry.calories > 0 ? Palette.gym : Palette.idle)
+                            .frame(width: 24, height: max(4, 70 * CGFloat(entry.calories) / CGFloat(maxCalories)))
+                        Text(entry.day.formatted(.dateTime.weekday(.narrow)))
+                            .font(.caption2)
+                            .foregroundStyle(Calendar.current.isDateInToday(entry.day) ? Palette.gymText : Palette.muted)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 92, alignment: .bottom)
+            if !Burn.hasBodyWeight {
+                Text("Calories assume 170 lb. Set your weight in Settings → Goals for better numbers.")
+                    .font(.caption)
+                    .foregroundStyle(Palette.muted)
+            }
+        }
+        .card()
+    }
+
+    private func weekStat(_ value: String, _ label: String, color: Color, symbol: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                if let symbol { Image(systemName: symbol).font(.system(size: 15, weight: .bold)).foregroundStyle(Palette.gym) }
+                Text(value)
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(color)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+            }
+            Text(label).font(.caption).foregroundStyle(Palette.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func coachCard(_ template: WorkoutTemplate) -> some View {
+        if !template.isCardio && !template.exercises.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Coach · today's \(template.name.lowercased())", systemImage: "bolt.fill")
+                    .font(.caption.weight(.heavy))
+                    .foregroundStyle(Palette.gymText)
+                    .textCase(.uppercase)
+                ForEach(template.exercises.prefix(4), id: \.self) { exercise in
+                    let last = GymHistory.lastSets(for: exercise, excluding: nil, in: allSets)
+                    let target = Coach.target(lastSets: last)
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(exercise).font(.subheadline.weight(.bold)).foregroundStyle(Palette.ink)
+                            Text(GymHistory.summary(last) ?? "First time: pick a weight you can do 10 times")
+                                .font(.caption)
+                                .foregroundStyle(Palette.muted)
+                        }
+                        Spacer(minLength: 6)
+                        if let target {
+                            VStack(alignment: .trailing, spacing: 1) {
+                                Text("\(Coach.format(target.weight)) × \(target.reps)")
+                                    .font(.subheadline.weight(.heavy))
+                                    .foregroundStyle(Palette.gymText)
+                                Text(target.reason)
+                                    .font(.caption2)
+                                    .foregroundStyle(Palette.muted)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                Button {
+                    start(template)
+                } label: {
+                    Label("Start \(template.name)", systemImage: "play.fill")
+                        .font(.headline)
+                        .foregroundStyle(Palette.onAccent)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .background(Palette.gym, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 6)
+            }
+            .card(fill: Palette.gymTint)
+        }
     }
 
     // MARK: Actions
@@ -176,9 +303,14 @@ struct GymView: View {
         context.insert(session)
         for exercise in template.exercises {
             let last = GymHistory.lastSets(for: exercise, excluding: nil, in: allSets)
-            let plan: [(Double, Int)] = last.isEmpty
-                ? [(0, 10), (0, 10), (0, 10)]
-                : last.map { ($0.weight, $0.reps) }
+            let plan: [(Double, Int)]
+            if let target = Coach.target(lastSets: last) {
+                plan = Array(repeating: (target.weight, target.reps), count: max(last.count, 3))
+            } else if !last.isEmpty {
+                plan = last.map { ($0.weight, $0.reps) }
+            } else {
+                plan = [(0, 10), (0, 10), (0, 10)]
+            }
             for (index, entry) in plan.enumerated() {
                 let log = SetLog(exercise: exercise, index: index, weight: entry.0, reps: entry.1)
                 context.insert(log)

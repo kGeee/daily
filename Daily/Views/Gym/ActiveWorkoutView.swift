@@ -7,7 +7,12 @@ struct ActiveWorkoutView: View {
     @Query private var allSets: [SetLog]
     @Query private var overrides: [DayTypeOverride]
     @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
+    @AppStorage("pref.restSeconds") private var restSeconds = 90
     @State private var confirmDiscard = false
+    @State private var restEnd: Date?
+    @State private var restFinished = 0
+
+    var onFinish: (WorkoutSession) -> Void = { _ in }
 
     private var isGymDay: Bool {
         DayPlanner(pattern: pattern, overrides: overrides).type(for: session.date) == .gym
@@ -17,13 +22,19 @@ struct ActiveWorkoutView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 header
+                statusBar
                 if isGymDay { trainBanner }
                 ForEach(session.exercises, id: \.self) { exercise in
-                    ExerciseCard(session: session, exercise: exercise, allSets: allSets)
+                    ExerciseCard(session: session, exercise: exercise, allSets: allSets) {
+                        startRest()
+                    }
                 }
                 cardioCard
                 Button {
-                    session.finishedAt = .now
+                    let now = Date()
+                    session.caloriesBurned = Burn.estimate(for: session, until: now)
+                    session.finishedAt = now
+                    onFinish(session)
                 } label: {
                     Text("Finish workout")
                         .font(.headline)
@@ -37,6 +48,7 @@ struct ActiveWorkoutView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Palette.bg.ignoresSafeArea())
+        .sensoryFeedback(.success, trigger: restFinished)
         .confirmationDialog("Discard this workout?", isPresented: $confirmDiscard, titleVisibility: .visible) {
             Button("Discard", role: .destructive) { context.delete(session) }
         }
@@ -69,6 +81,72 @@ struct ActiveWorkoutView: View {
         .padding(.top, 8)
     }
 
+    // MARK: Rest timer and calories
+
+    private func startRest() {
+        let end = Date().addingTimeInterval(Double(restSeconds))
+        restEnd = end
+        Task {
+            try? await Task.sleep(for: .seconds(Double(restSeconds)))
+            if restEnd == end {
+                restEnd = nil
+                restFinished += 1
+            }
+        }
+    }
+
+    private var statusBar: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { tl in
+            HStack(spacing: 12) {
+                if let restEnd, restEnd > tl.date {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("REST").font(.caption2.weight(.heavy)).opacity(0.7)
+                        Text(Pomodoro.clock(restEnd.timeIntervalSince(tl.date)))
+                            .font(.system(size: 26, weight: .heavy).monospacedDigit())
+                    }
+                    Spacer()
+                    Button("+30s") {
+                        let end = restEnd.addingTimeInterval(30)
+                        self.restEnd = end
+                        Task {
+                            try? await Task.sleep(for: .seconds(end.timeIntervalSinceNow))
+                            if self.restEnd == end {
+                                self.restEnd = nil
+                                restFinished += 1
+                            }
+                        }
+                    }
+                    .font(.subheadline.weight(.bold))
+                    .padding(.horizontal, 12)
+                    .frame(height: 34)
+                    .background(Palette.bg.opacity(0.15), in: Capsule())
+                    Button("Skip") { self.restEnd = nil }
+                        .font(.subheadline.weight(.bold))
+                        .padding(.horizontal, 12)
+                        .frame(height: 34)
+                        .background(Palette.bg.opacity(0.15), in: Capsule())
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("BURNED SO FAR").font(.caption2.weight(.heavy)).opacity(0.7)
+                        HStack(spacing: 4) {
+                            Image(systemName: "flame.fill").foregroundStyle(Palette.gym)
+                            Text("\(Burn.estimate(for: session, until: tl.date)) cal")
+                                .font(.system(size: 22, weight: .heavy).monospacedDigit())
+                        }
+                    }
+                    Spacer()
+                    Text("Check off a set to start a \(restSeconds)s rest")
+                        .font(.caption)
+                        .opacity(0.7)
+                        .multilineTextAlignment(.trailing)
+                }
+            }
+            .foregroundStyle(Palette.bg)
+            .card(padding: 14, fill: Palette.ink)
+            .buttonStyle(.plain)
+        }
+    }
+
     /// Your next way home today, from the gym-day routine.
     private var nextDeparture: TimelineBlock? {
         DayPlanner(pattern: pattern, overrides: overrides)
@@ -98,6 +176,15 @@ struct ActiveWorkoutView: View {
     private var cardioCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Cardio")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(CardioKind.allCases) { kind in
+                        ChoiceChip(title: kind.title, isOn: session.cardioKindRaw == kind.rawValue, tint: Palette.gym) {
+                            session.cardioKindRaw = session.cardioKindRaw == kind.rawValue ? "" : kind.rawValue
+                        }
+                    }
+                }
+            }
             Stepper(value: $session.cardioMinutes, in: 0...180, step: 5) {
                 Text(session.cardioMinutes == 0 ? "None" : "\(session.cardioMinutes) min")
                     .font(.subheadline.weight(.bold))
@@ -117,6 +204,7 @@ struct ExerciseCard: View {
     let session: WorkoutSession
     let exercise: String
     let allSets: [SetLog]
+    var onSetDone: () -> Void = {}
 
     private var sets: [SetLog] {
         session.sets.filter { $0.exercise == exercise }.sorted { $0.index < $1.index }
@@ -144,8 +232,32 @@ struct ExerciseCard: View {
             .font(.caption2.weight(.bold))
             .foregroundStyle(Palette.muted)
 
+            if let target = Coach.target(lastSets: last),
+               sets.contains(where: { !$0.isDone && ($0.weight != target.weight || $0.reps != target.reps) }) {
+                Button {
+                    for set in sets where !set.isDone {
+                        set.weight = target.weight
+                        set.reps = target.reps
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.fill")
+                        Text("Coach: \(Coach.format(target.weight)) × \(target.reps) · \(target.reason)")
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 4)
+                        Text("Apply").font(.footnote.weight(.heavy))
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Palette.gymText)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Palette.gymTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(.plain)
+            }
+
             ForEach(sets) { entry in
-                SetRow(entry: entry)
+                SetRow(entry: entry, onDone: onSetDone)
             }
 
             Button {
@@ -177,6 +289,7 @@ struct ExerciseCard: View {
 struct SetRow: View {
     @Environment(\.modelContext) private var context
     @Bindable var entry: SetLog
+    var onDone: () -> Void = {}
 
     var body: some View {
         HStack(spacing: 8) {
@@ -198,7 +311,10 @@ struct SetRow: View {
                 .background(Palette.card2, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             Button {
                 entry.isDone.toggle()
-                if entry.isDone { entry.date = .now }
+                if entry.isDone {
+                    entry.date = .now
+                    onDone()
+                }
             } label: {
                 Image(systemName: "checkmark")
                     .font(.system(size: 16, weight: .heavy))

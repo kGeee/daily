@@ -88,6 +88,8 @@ struct SettingsView: View {
     @AppStorage(Pref.calorieGoal) private var calorieGoal = Pref.calorieGoalDefault
     @AppStorage(Pref.proteinGoal) private var proteinGoal = Pref.proteinGoalDefault
     @State private var exportURL: URL?
+    @AppStorage(Burn.weightKey) private var bodyWeight: Double = 0
+    @AppStorage("pref.restSeconds") private var restSeconds = 90
     @AppStorage(CheckIn.onKey) private var checkInOn = false
     @AppStorage(CheckIn.timeKey) private var checkInTime = CheckIn.defaultTime
     @State private var showSetup = false
@@ -192,6 +194,22 @@ struct SettingsView: View {
                             Text("Protein a day")
                             Spacer()
                             Text("\(proteinGoal) g").foregroundStyle(Palette.muted)
+                        }
+                    }
+                    HStack {
+                        Text("Body weight")
+                        Spacer()
+                        TextField("lb", value: $bodyWeight, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 70)
+                        Text("lb").foregroundStyle(Palette.muted)
+                    }
+                    Stepper(value: $restSeconds, in: 30...300, step: 15) {
+                        HStack {
+                            Text("Rest between sets")
+                            Spacer()
+                            Text("\(restSeconds)s").foregroundStyle(Palette.muted)
                         }
                     }
                     Stepper(value: $eatOutGoal, in: 0...14) {

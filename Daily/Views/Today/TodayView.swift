@@ -17,6 +17,7 @@ struct TodayView: View {
     @State private var showWeekPlan = false
     @State private var showMonth = false
     @State private var showJournal = false
+    @State private var showVoice = false
     @State private var checkInPhoto: JournalView.PhotoDraft?
     @Query(sort: \JournalEntry.date, order: .reverse) private var journal: [JournalEntry]
     @State private var showReview = false
@@ -76,6 +77,19 @@ struct TodayView: View {
             }
             .background(Palette.bg.ignoresSafeArea())
             .overlay(alignment: .bottomTrailing) {
+                VStack(spacing: 12) {
+                Button {
+                    showVoice = true
+                } label: {
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Palette.commute)
+                        .frame(width: 52, height: 52)
+                        .background(Palette.card, in: Circle())
+                        .shadow(color: .black.opacity(0.14), radius: 6, y: 3)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Plan your day by voice")
                 Button {
                     showNewEvent = true
                 } label: {
@@ -87,12 +101,16 @@ struct TodayView: View {
                         .shadow(color: .black.opacity(0.18), radius: 8, y: 4)
                 }
                 .buttonStyle(.plain)
-                .padding(20)
                 .accessibilityLabel("Add event")
+                }
+                .padding(20)
             }
         }
         .sheet(isPresented: $showWeekPlan) {
             WeekPlanView()
+        }
+        .sheet(isPresented: $showVoice) {
+            VoicePlanSheet(day: selectedDay)
         }
         .sheet(isPresented: $showJournal) {
             JournalView()

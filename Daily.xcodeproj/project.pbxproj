@@ -435,6 +435,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos for your journal and meals.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk to Daily to plan your day or ask your coach.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Turns what you say into events and coach questions.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -467,6 +469,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Daily;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take photos for your journal and meals.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk to Daily to plan your day or ask your coach.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Turns what you say into events and coach questions.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

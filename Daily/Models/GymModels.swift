@@ -49,6 +49,9 @@ final class WorkoutSession {
     var finishedAt: Date?
     var cardioMinutes: Int
     var cardioNote: String
+    var cardioKindRaw: String = ""
+    /// Saved when you finish (and editable); nil while the workout is going.
+    var caloriesBurned: Int? = nil
     @Relationship(deleteRule: .cascade, inverse: \SetLog.session) var sets: [SetLog] = []
 
     init(templateName: String, exercises: [String]) {
