@@ -69,6 +69,7 @@ enum AIClient {
 
     static func structured<T: Decodable>(prompt: String, toolName: String, toolDescription: String,
                                          schema: [String: Any], as type: T.Type,
+                                         images: [Data] = [],
                                          maxTokens: Int = 4096) async throws -> T {
         guard let key = Keychain.read(), !key.isEmpty else { throw AIError.noKey }
         guard let url = URL(string: "https://api.anthropic.com/v1/messages") else { throw AIError.badResponse }
@@ -89,7 +90,7 @@ enum AIClient {
                 "input_schema": schema
             ] as [String: Any]],
             "tool_choice": ["type": "tool", "name": toolName],
-            "messages": [["role": "user", "content": prompt]]
+            "messages": [["role": "user", "content": messageContent(prompt: prompt, images: images)]]
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -107,6 +108,17 @@ enum AIClient {
 
         let inputData = try JSONSerialization.data(withJSONObject: input)
         return try JSONDecoder().decode(T.self, from: inputData)
+    }
+
+    /// Plain text, or JPEG image blocks followed by the text (images first works best).
+    static func messageContent(prompt: String, images: [Data]) -> Any {
+        guard !images.isEmpty else { return prompt }
+        var blocks: [[String: Any]] = images.map { data in
+            ["type": "image",
+             "source": ["type": "base64", "media_type": "image/jpeg", "data": data.base64EncodedString()]]
+        }
+        blocks.append(["type": "text", "text": prompt])
+        return blocks
     }
 }
 
@@ -132,6 +144,8 @@ struct MacroEstimate: Decodable {
     var carbs: Double
     var fat: Double
     var note: String?
+    /// Only asked for when estimating from a photo with no name typed.
+    var name: String?
 }
 
 enum RecipeAI {
@@ -191,19 +205,47 @@ enum RecipeAI {
         return try await estimate(prompt: prompt)
     }
 
-    /// Estimate nutrition for a meal described in words, e.g. "Chipotle chicken burrito bowl with guac".
-    static func estimate(meal description: String) async throws -> MacroEstimate {
-        let prompt = """
-        Estimate the calories and macros of this meal as typically served (one person's portion). \
-        If it names a restaurant, use that restaurant's typical portion.
-        Meal: \(description)
-        """
-        return try await estimate(prompt: prompt)
+    /// Estimate nutrition for a meal described in words, e.g. "Chipotle chicken burrito bowl with guac",
+    /// and/or shown in a photo (a JPEG, already shrunk). `place` is the restaurant, if picked.
+    static func estimate(meal description: String, photo: Data? = nil, place: String? = nil) async throws -> MacroEstimate {
+        let prompt = mealPrompt(description: description, hasPhoto: photo != nil, place: place)
+        return try await estimate(prompt: prompt, images: photo.map { [$0] } ?? [],
+                                  wantsName: photo != nil && description.isEmpty)
     }
 
-    private static func estimate(prompt: String) async throws -> MacroEstimate {
+    static func mealPrompt(description: String, hasPhoto: Bool, place: String?) -> String {
+        var lines: [String] = []
+        if hasPhoto {
+            lines.append("Estimate the calories and macros of the meal in this photo. Identify the foods and judge "
+                         + "the portion from the plate, bowl, packaging or hands for scale. Count only what's shown.")
+            if !description.isEmpty {
+                lines.append("The person describes it as: \(description). Trust their description for what it is "
+                             + "and use the photo for how much.")
+            }
+            if description.isEmpty {
+                lines.append("Also give it a short name, e.g. \"Chicken burrito bowl\".")
+            }
+        } else {
+            lines.append("Estimate the calories and macros of this meal as typically served (one person's portion).")
+            lines.append("Meal: \(description)")
+        }
+        if let place, !place.isEmpty {
+            lines.append("It's from \(place); use that restaurant's typical recipe and portion if you know it.")
+        } else if !hasPhoto {
+            lines.append("If it names a restaurant, use that restaurant's typical portion.")
+        }
+        if hasPhoto {
+            lines.append("In the note, say in a few words what you saw and assumed about the portion.")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func estimate(prompt: String, images: [Data] = [], wantsName: Bool = false) async throws -> MacroEstimate {
         var properties = macroProperties
         properties["note"] = ["type": "string", "description": "One short line on assumptions"]
+        if wantsName {
+            properties["name"] = ["type": "string", "description": "Short name for the meal"]
+        }
         let schema: [String: Any] = [
             "type": "object",
             "properties": properties,
@@ -211,7 +253,7 @@ enum RecipeAI {
         ]
         return try await AIClient.structured(prompt: prompt, toolName: "nutrition",
                                              toolDescription: "Report the nutrition estimate",
-                                             schema: schema, as: MacroEstimate.self)
+                                             schema: schema, as: MacroEstimate.self, images: images)
     }
 }
 

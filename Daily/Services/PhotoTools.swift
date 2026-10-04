@@ -22,6 +22,11 @@ enum ImageTools {
     static func jpeg(fromData data: Data) -> Data? {
         UIImage(data: data).flatMap { jpeg(from: $0) }
     }
+
+    /// A smaller copy to send to the AI (plenty to read a plate, and cheaper).
+    static func forAI(_ data: Data) -> Data? {
+        UIImage(data: data).flatMap { jpeg(from: $0, maxDimension: 1024, quality: 0.7) }
+    }
 }
 
 /// The camera, wrapped for SwiftUI. Falls back to nothing on devices without one (the simulator).

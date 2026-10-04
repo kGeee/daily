@@ -539,10 +539,15 @@ struct LogMealSheet: View {
         estimating = true
         estimateNote = nil
         let description = trimmedName
+        let picture = photo.flatMap(ImageTools.forAI)
+        let place = source == .out ? restaurants.first(where: { $0.id == restaurantID })?.name : nil
         Task {
             do {
-                let result = try await RecipeAI.estimate(meal: description)
+                let result = try await RecipeAI.estimate(meal: description, photo: picture, place: place)
                 withAnimation(.snappy) {
+                    if trimmedName.isEmpty, let suggested = result.name, !suggested.isEmpty {
+                        name = suggested
+                    }
                     calories = String(Int(result.calories.rounded()))
                     protein = String(Int(result.protein.rounded()))
                     carbs = String(Int(result.carbs.rounded()))
@@ -686,8 +691,8 @@ struct LogMealSheet: View {
                     .background(Palette.foodTint, in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .disabled(estimating || trimmedName.isEmpty)
-                .opacity(trimmedName.isEmpty ? 0.5 : 1)
+                .disabled(estimating || !canEstimate)
+                .opacity(canEstimate ? 1 : 0.5)
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 macroField("Calories", unit: "cal", text: $calories)
@@ -695,12 +700,26 @@ struct LogMealSheet: View {
                 macroField("Carbs", unit: "g", text: $carbs)
                 macroField("Fat", unit: "g", text: $fat)
             }
-            Text(estimateNote ?? "Describe it specifically for a better estimate, e.g. \"chicken burrito bowl, white rice, black beans, guac\".")
+            Text(estimateNote ?? estimateHint)
                 .font(.footnote)
                 .foregroundStyle(Palette.muted)
         }
         .padding(16)
         .background(Palette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var canEstimate: Bool { !trimmedName.isEmpty || photo != nil }
+
+    private var estimateHint: String {
+        photo != nil
+            ? "Estimates use your photo for what's on the plate and how much."
+            : "Describe it or add a photo for a better estimate, e.g. \"chicken burrito bowl, white rice, black beans, guac\"."
+    }
+
+    /// A new photo on a meal with no numbers yet: estimate from it right away.
+    private func photoAdded() {
+        guard calories.isEmpty, !estimating, Keychain.hasKey else { return }
+        estimate()
     }
 
     private func macroField(_ title: String, unit: String, text: Binding<String>) -> some View {
@@ -775,6 +794,7 @@ struct LogMealSheet: View {
             } else {
                 PhotoSourceButtons(tint: Palette.food, compact: true) { data in
                     withAnimation(.snappy) { photo = data }
+                    photoAdded()
                 }
                 Text("Shows up in your journal" + (source == .out ? " and on the restaurant's page." : "."))
                     .font(.footnote)
