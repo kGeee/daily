@@ -36,6 +36,7 @@ struct RootView: View {
     @Query private var plans: [MealPlan]
     @Query private var checks: [BlockCheck]
     @State private var pendingImport: SharedStore.PendingImport?
+    @State private var pendingInvite: EventEditor.ImportLink?
     @State private var addingEvent = false
     @State private var showSetup = Setup.needsSetup()
     @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
@@ -94,6 +95,9 @@ struct RootView: View {
         .sheet(item: $pendingImport) { item in
             ImportRecipeView(link: item.link, text: item.text, autoRun: true)
         }
+        .sheet(item: $pendingInvite) { item in
+            ImportEventSheet(link: item.url)
+        }
         .sheet(isPresented: $addingEvent) {
             EventEditor(event: nil, defaultDay: Date())
         }
@@ -110,8 +114,14 @@ struct RootView: View {
         WidgetSync.mergePendingChecks(into: context, existing: checks)
         FocusController.settle(context: context)
         if SharedStore.takeAddEventRequest() { addingEvent = true }
-        if pendingImport == nil, let next = SharedStore.takePendingImports().last {
-            pendingImport = next
+        if pendingImport == nil, pendingInvite == nil, let next = SharedStore.takePendingImports().last {
+            // Invites (Partiful, Luma…) become events; anything else goes to the recipe importer.
+            let link = next.link.isEmpty ? EventImporter.firstLink(in: next.text) ?? "" : next.link
+            if EventImporter.isEventLink(link) {
+                pendingInvite = EventEditor.ImportLink(url: link)
+            } else {
+                pendingImport = next
+            }
         }
         refreshWidgets()
         Task { await WidgetSync.endFinishedCountdowns() }

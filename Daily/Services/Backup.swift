@@ -34,7 +34,7 @@ enum Backup {
     struct WaterDTO: Codable { var date: Date; var ounces: Int }
     struct CheckDTO: Codable { var dayKey, blockID: String }
     struct OverrideDTO: Codable { var dayKey, type: String }
-    struct EventDTO: Codable { var id: UUID; var title, note: String; var start: Date; var duration: Int; var kind, repeats: String; var remind: Bool }
+    struct EventDTO: Codable { var id: UUID; var title, note: String; var start: Date; var duration: Int; var kind, repeats: String; var remind: Bool; var link: String? = nil; var location: String? = nil }
     struct TemplateDTO: Codable { var name: String; var order: Int; var exercises: String; var isCardio: Bool }
     struct SetDTO: Codable { var exercise: String; var index: Int; var weight: Double; var reps: Int; var isDone: Bool; var date: Date }
     struct SessionDTO: Codable {
@@ -89,7 +89,8 @@ enum Backup {
         file.overrides = try context.fetch(FetchDescriptor<DayTypeOverride>()).map { OverrideDTO(dayKey: $0.dayKey, type: $0.typeRaw) }
         file.events = try context.fetch(FetchDescriptor<CustomEvent>()).map {
             EventDTO(id: $0.id, title: $0.title, note: $0.note, start: $0.start, duration: $0.durationMinutes,
-                     kind: $0.kindRaw, repeats: $0.repeatRaw, remind: $0.remind)
+                     kind: $0.kindRaw, repeats: $0.repeatRaw, remind: $0.remind,
+                     link: $0.link, location: $0.location)
         }
         file.templates = try context.fetch(FetchDescriptor<WorkoutTemplate>()).map {
             TemplateDTO(name: $0.name, order: $0.order, exercises: $0.exercisesRaw, isCardio: $0.isCardio)
@@ -173,6 +174,8 @@ enum Backup {
                                     kind: EventKind(rawValue: e.kind) ?? .general,
                                     repeats: EventRepeat(rawValue: e.repeats) ?? .none, remind: e.remind)
             event.id = e.id
+            event.link = e.link ?? ""
+            event.location = e.location ?? ""
             context.insert(event)
         }
         for t in file.templates {

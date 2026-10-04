@@ -2,8 +2,8 @@ import UIKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// "Share → Daily" from Instagram or Safari. Saves the link (and any text) for the app,
-/// which opens the recipe importer next time it's opened.
+/// "Share → Daily" from Instagram, Safari, Partiful or Luma. Saves the link (and any text) for the app,
+/// which opens the event importer (invites) or the recipe importer next time it's opened.
 final class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -67,7 +67,7 @@ private struct SavedView: View {
                 .foregroundStyle(Color(red: 0x23 / 255, green: 0x74 / 255, blue: 0x4A / 255))
             Text("Saved to Daily")
                 .font(.title3.weight(.bold))
-            Text("Open Daily to import the recipe.")
+            Text("Open Daily to finish importing.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

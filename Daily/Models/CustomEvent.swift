@@ -62,6 +62,9 @@ final class CustomEvent {
     var kindRaw: String
     var repeatRaw: String
     var remind: Bool
+    /// The invite it came from (Partiful, Luma…), if imported.
+    var link: String = ""
+    var location: String = ""
 
     init(title: String, note: String = "", start: Date, durationMinutes: Int,
          kind: EventKind, repeats: EventRepeat, remind: Bool) {
@@ -135,13 +138,24 @@ struct EventEditor: View {
     @State private var remind: Bool
     @State private var showDate = false
     @State private var showTime = false
+    @State private var link: String
+    @State private var location: String
+    @State private var importLink: ImportLink?
+    @State private var savedFromImport = false
     @FocusState private var titleFocused: Bool
+    @Environment(\.openURL) private var openURL
+    private let isImport: Bool
+    private let onSaved: (() -> Void)?
+
+    struct ImportLink: Identifiable { let id = UUID(); let url: String }
 
     private let durations = [0, 15, 30, 45, 60, 90, 120, 180, 240]
 
-    init(event: CustomEvent?, defaultDay: Date) {
+    init(event: CustomEvent?, defaultDay: Date, imported: ImportedEvent? = nil, onSaved: (() -> Void)? = nil) {
         self.event = event
-        self.day = defaultDay
+        self.day = imported?.start ?? defaultDay
+        self.isImport = imported != nil
+        self.onSaved = onSaved
         let cal = Calendar.current
         let suggested: Date = {
             if cal.isDateInToday(defaultDay) {
@@ -160,6 +174,16 @@ struct EventEditor: View {
         _kind = State(initialValue: event?.kind ?? .general)
         _repeats = State(initialValue: event?.repeats ?? .none)
         _remind = State(initialValue: event?.remind ?? true)
+        _link = State(initialValue: event?.link ?? "")
+        _location = State(initialValue: event?.location ?? "")
+        if let imported {
+            _title = State(initialValue: imported.title)
+            _note = State(initialValue: imported.note)
+            if let start = imported.start { _start = State(initialValue: start) }
+            _duration = State(initialValue: imported.durationMinutes)
+            _link = State(initialValue: imported.link)
+            _location = State(initialValue: imported.location)
+        }
     }
 
     private var trimmedTitle: String { title.trimmingCharacters(in: .whitespaces) }
@@ -213,6 +237,10 @@ struct EventEditor: View {
                                .submitLabel(.done)
                        })
         } content: {
+            if event == nil && !isImport {
+                importCard
+            }
+
             DetailCard {
                 DetailExpandableRow(symbol: "calendar", tint: kind.category.color,
                                     title: start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year()),
@@ -260,6 +288,7 @@ struct EventEditor: View {
                 }
                 .buttonStyle(.plain)
                 .sensoryFeedback(.selection, trigger: remind)
+                inviteRows
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -287,8 +316,67 @@ struct EventEditor: View {
             }
         }
         .onAppear {
-            if event == nil { titleFocused = true }
+            if event == nil && !isImport { titleFocused = true }
         }
+        .sheet(item: $importLink, onDismiss: {
+            if savedFromImport { dismiss() }
+        }) { item in
+            ImportEventSheet(link: item.url, onSaved: { savedFromImport = true })
+        }
+    }
+
+    /// Where it is and the original invite, for imported events.
+    @ViewBuilder private var inviteRows: some View {
+        if !location.isEmpty {
+            DetailDivider()
+            Button {
+                if let url = MapsApp.url(for: .current, name: location, address: "", latitude: nil, longitude: nil) {
+                    openURL(url)
+                }
+            } label: {
+                DetailRowLabel(symbol: "mappin.and.ellipse", tint: kind.category.color, title: location)
+            }
+            .buttonStyle(.plain)
+        }
+        if let url = URL(string: link), !link.isEmpty {
+            DetailDivider()
+            Button {
+                openURL(url)
+            } label: {
+                DetailRowLabel(symbol: "ticket.fill", tint: kind.category.color,
+                               title: "Open in " + EventImporter.sourceName(for: link))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// "Got an invite?" Paste a Partiful or Luma link to fill everything in.
+    private var importCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "ticket.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Palette.general)
+                .frame(width: 38, height: 38)
+                .background(Palette.circle, in: Circle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Got an invite?")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Palette.ink)
+                Text("Paste a Partiful or Luma link")
+                    .font(.caption)
+                    .foregroundStyle(Palette.muted)
+            }
+            Spacer()
+            PasteButton(payloadType: String.self) { strings in
+                guard let text = strings.first, let url = EventImporter.firstLink(in: text) else { return }
+                Task { @MainActor in importLink = ImportLink(url: url) }
+            }
+            .buttonBorderShape(.capsule)
+            .labelStyle(.titleOnly)
+            .tint(Palette.general)
+        }
+        .padding(14)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private func label(for minutes: Int) -> String {
@@ -308,10 +396,16 @@ struct EventEditor: View {
             event.kindRaw = kind.rawValue
             event.repeatRaw = repeats.rawValue
             event.remind = remind
+            event.link = link
+            event.location = location
         } else {
-            context.insert(CustomEvent(title: trimmed, note: note, start: start, durationMinutes: duration,
-                                       kind: kind, repeats: repeats, remind: remind))
+            let created = CustomEvent(title: trimmed, note: note, start: start, durationMinutes: duration,
+                                      kind: kind, repeats: repeats, remind: remind)
+            created.link = link
+            created.location = location
+            context.insert(created)
         }
+        onSaved?()
         dismiss()
     }
 }
