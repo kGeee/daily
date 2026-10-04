@@ -7,6 +7,8 @@ struct ImportEventSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var events: [CustomEvent]
     let link: String
+    /// Any text shared or pasted with the link (e.g. "You're invited to … Sat 8pm"), read if the page isn't enough.
+    var text: String = ""
     var onSaved: (() -> Void)? = nil
 
     private enum Phase {
@@ -39,7 +41,7 @@ struct ImportEventSheet: View {
     private func load() async {
         guard case .loading = phase else { return }
         do {
-            let imported = try await EventImporter.load(link)
+            let imported = try await EventImporter.load(link, sharedText: text)
             withAnimation(.snappy) { phase = .loaded(imported) }
         } catch let error as EventImportError {
             var title: String?
@@ -91,6 +93,11 @@ struct ImportEventSheet: View {
             Button("Cancel") { dismiss() }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Palette.muted)
+            Text("Private invites sometimes hide the details until you RSVP.")
+                .font(.caption)
+                .foregroundStyle(Palette.faint)
+                .multilineTextAlignment(.center)
+                .padding(.top, 10)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

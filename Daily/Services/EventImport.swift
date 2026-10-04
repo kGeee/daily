@@ -323,14 +323,25 @@ enum EventImporter {
     }
 
     /// Fetches the invite and reads it. Falls back to AI when the page has no machine-readable time.
-    static func load(_ link: String) async throws -> ImportedEvent {
+    static func load(_ link: String, sharedText: String = "") async throws -> ImportedEvent {
         guard let url = URL(string: link), url.scheme?.hasPrefix("http") == true else { throw EventImportError.badLink }
         var request = URLRequest(url: url)
         request.timeoutInterval = 30
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
                          forHTTPHeaderField: "User-Agent")
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let html = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+        let extra = sharedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let html: String
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                throw URLError(.badServerResponse)
+            }
+            html = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
+        } catch {
+            // The page wouldn't load (offline, or a private invite). Text shared with it may still be enough.
+            guard !extra.isEmpty, Keychain.hasKey else { throw error }
+            html = ""
+        }
 
         let parsed = parse(html: html, link: link)
         if let parsed, parsed.start != nil { return parsed }
@@ -338,7 +349,8 @@ enum EventImporter {
         let meta = EventPageParser.metaTags(html: html)
         let title = parsed?.title ?? meta["og:title"] ?? meta["twitter:title"]
         guard Keychain.hasKey else { throw EventImportError.notAnEvent(title: title) }
-        let text = EventPageParser.pageText(html: html)
+        var text = EventPageParser.pageText(html: html)
+        if !extra.isEmpty { text = "Shared with the link: " + extra + "\n\n" + text }
         guard var event = try? await EventImportAI.extract(link: link, meta: meta, text: text), event.start != nil else {
             throw EventImportError.notAnEvent(title: title)
         }

@@ -96,7 +96,7 @@ struct RootView: View {
             ImportRecipeView(link: item.link, text: item.text, autoRun: true)
         }
         .sheet(item: $pendingInvite) { item in
-            ImportEventSheet(link: item.url)
+            ImportEventSheet(link: item.url, text: item.text)
         }
         .sheet(isPresented: $addingEvent) {
             EventEditor(event: nil, defaultDay: Date())
@@ -118,7 +118,7 @@ struct RootView: View {
             // Invites (Partiful, Luma…) become events; anything else goes to the recipe importer.
             let link = next.link.isEmpty ? EventImporter.firstLink(in: next.text) ?? "" : next.link
             if EventImporter.isEventLink(link) {
-                pendingInvite = EventEditor.ImportLink(url: link)
+                pendingInvite = EventEditor.ImportLink(url: link, text: next.text)
             } else {
                 pendingImport = next
             }

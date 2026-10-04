@@ -116,7 +116,7 @@ final class CustomEvent {
         let begin = cal.date(bySettingHour: parts.hour ?? 0, minute: parts.minute ?? 0, second: 0, of: day) ?? day
         let end = durationMinutes > 0 ? begin.addingTimeInterval(Double(durationMinutes) * 60) : nil
         return TimelineBlock(id: "event-" + id.uuidString, start: begin, end: end, title: title,
-                             subtitle: note, category: kind.category, symbol: kind.symbol,
+                             subtitle: location.isEmpty ? note : location, category: kind.category, symbol: kind.symbol,
                              eventID: id)
     }
 }
@@ -147,7 +147,7 @@ struct EventEditor: View {
     private let isImport: Bool
     private let onSaved: (() -> Void)?
 
-    struct ImportLink: Identifiable { let id = UUID(); let url: String }
+    struct ImportLink: Identifiable { let id = UUID(); let url: String; var text: String = "" }
 
     private let durations = [0, 15, 30, 45, 60, 90, 120, 180, 240]
 
@@ -240,6 +240,14 @@ struct EventEditor: View {
             if event == nil && !isImport {
                 importCard
             }
+            if event != nil && isImport {
+                Label("Already on your timeline. Saving updates it.", systemImage: "arrow.clockwise")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.commuteText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(Palette.commuteTint, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
 
             DetailCard {
                 DetailExpandableRow(symbol: "calendar", tint: kind.category.color,
@@ -321,7 +329,7 @@ struct EventEditor: View {
         .sheet(item: $importLink, onDismiss: {
             if savedFromImport { dismiss() }
         }) { item in
-            ImportEventSheet(link: item.url, onSaved: { savedFromImport = true })
+            ImportEventSheet(link: item.url, text: item.text, onSaved: { savedFromImport = true })
         }
     }
 
@@ -369,7 +377,7 @@ struct EventEditor: View {
             Spacer()
             PasteButton(payloadType: String.self) { strings in
                 guard let text = strings.first, let url = EventImporter.firstLink(in: text) else { return }
-                Task { @MainActor in importLink = ImportLink(url: url) }
+                Task { @MainActor in importLink = ImportLink(url: url, text: text == url ? "" : text) }
             }
             .buttonBorderShape(.capsule)
             .labelStyle(.titleOnly)
