@@ -24,13 +24,28 @@ struct TodayView: View {
     @State private var showSettings = false
     @State private var stepEdit: StepDayEdit?
     @Query private var plans: [MealPlan]
+    @Query private var restaurants: [Restaurant]
+    @Query private var focusSessions: [FocusSession]
+    @Query private var allSets: [SetLog]
+    @AppStorage(WeekGoal.key) private var weekGoal = ""
+    @State private var showScore = false
+    @State private var showStreaks = false
+    @State private var celebrating = false
     @AppStorage(Pref.revision) private var revision = 0
 
     private var planner: DayPlanner { DayPlanner(pattern: pattern, overrides: overrides) }
     private var dayKey: String { DayKey.of(selectedDay) }
+    private var scoreBuilder: ScoreBuilder {
+        ScoreBuilder(planner: planner, food: food, water: water, checks: checks, events: events,
+                     sessions: sessions, journal: journal)
+    }
 
     var body: some View {
         let _ = revision
+        let builder = scoreBuilder
+        let dayScore = builder.score(for: selectedDay)
+        let todayClosed = builder.score(for: .now).isClosed
+        let streaks = builder.streaks()
         TimelineView(.everyMinute) { tl in
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -46,6 +61,7 @@ struct TodayView: View {
                                     onOpenJournal: { showJournal = true },
                                     onPhoto: { data in checkInPhoto = JournalView.PhotoDraft(data: data) })
                     }
+                    scoreSection(dayScore, streaks: streaks)
                     statsRow
                     goalsRow
                     if Calendar.current.isDateInToday(selectedDay),
@@ -54,8 +70,8 @@ struct TodayView: View {
                             showReview = true
                         } label: {
                             HStack(spacing: 10) {
-                                Image(systemName: "chart.bar.xaxis")
-                                Text("Your week in review is ready")
+                                Image(systemName: "sparkles")
+                                Text("Your week recap is ready")
                                     .font(.subheadline.weight(.bold))
                                 Spacer()
                                 Image(systemName: "chevron.right").font(.caption.weight(.bold))
@@ -122,8 +138,26 @@ struct TodayView: View {
             MonthView { day in selectedDay = day }
         }
         .sheet(isPresented: $showReview) {
-            WeekReviewView()
+            RecapView(recap: builder.recap(restaurants: restaurants, focus: focusSessions, allSets: allSets))
         }
+        .sheet(isPresented: $showScore) {
+            ScoreDetailSheet(score: dayScore, bestThisWeek: bestThisWeek(builder))
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showStreaks) {
+            StreaksView(streaks: streaks)
+        }
+        .overlay {
+            if celebrating {
+                DayClosedOverlay(score: builder.score(for: .now),
+                                 closedThisWeek: closedThisWeek(builder),
+                                 streak: streaks.first { $0.id == "closed" }?.current ?? 0) {
+                    withAnimation(.snappy) { celebrating = false }
+                }
+            }
+        }
+        .onAppear { celebrateIfClosed(todayClosed) }
+        .onChange(of: todayClosed) { _, closed in celebrateIfClosed(closed) }
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
@@ -136,6 +170,50 @@ struct TodayView: View {
         .sheet(item: $editingEvent) { event in
             EventEditor(event: event, defaultDay: selectedDay)
         }
+    }
+
+    // MARK: Score
+
+    private func scoreSection(_ score: DayScore, streaks: [ScoreBuilder.StreakSummary]) -> some View {
+        let showGoal = !weekGoal.isEmpty
+            && Calendar.current.isDate(selectedDay, equalTo: .now, toGranularity: .weekOfYear)
+        return VStack(alignment: .leading, spacing: 10) {
+            DayScoreCard(score: score, streaks: streaks,
+                         onOpenScore: { showScore = true },
+                         onOpenStreaks: { showStreaks = true })
+            if showGoal {
+                Label("This week: " + weekGoal, systemImage: "target")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Palette.foodText)
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .background(Palette.foodTint, in: Capsule())
+            }
+        }
+    }
+
+    /// Confetti the first time today's rings all close.
+    private func celebrateIfClosed(_ closed: Bool) {
+        let key = "celebrated." + DayKey.of(.now)
+        guard closed, !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        withAnimation(.snappy) { celebrating = true }
+    }
+
+    private func thisWeekSoFar() -> [Date] {
+        let cal = Calendar.current
+        guard let week = cal.dateInterval(of: .weekOfYear, for: .now) else { return [] }
+        let today = cal.startOfDay(for: .now)
+        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: week.start) }.filter { $0 <= today }
+    }
+
+    private func closedThisWeek(_ builder: ScoreBuilder) -> Int {
+        thisWeekSoFar().filter { builder.score(for: $0).isClosed }.count
+    }
+
+    private func bestThisWeek(_ builder: ScoreBuilder) -> (day: Date, score: Int)? {
+        let scored = thisWeekSoFar().map { (day: $0, score: builder.score(for: $0).score) }
+        return scored.count > 1 ? scored.max { $0.score < $1.score } : nil
     }
 
     // MARK: Header
