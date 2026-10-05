@@ -57,21 +57,16 @@ struct MonthView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    monthHeader
-                    grid.card(padding: 12)
-                    dayCard
+            content
+                .background(Palette.bg.ignoresSafeArea())
+                .toolbar {
+                    // In the Mac sidebar it's a page of its own, so there's nothing to close.
+                    if !Platform.isMac || openDay != nil {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { dismiss() }
+                        }
+                    }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 30)
-            }
-            .background(Palette.bg.ignoresSafeArea())
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
         }
         .sheet(item: $newEventDay) { day in
             EventEditor(event: nil, defaultDay: day.date)
@@ -79,6 +74,121 @@ struct MonthView: View {
         .sheet(item: $editingEvent) { event in
             EventEditor(event: event, defaultDay: selected)
         }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        #if os(macOS)
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                monthHeader
+                macGrid
+            }
+            ScrollView {
+                dayCard
+            }
+            .frame(width: 300)
+            .padding(.top, 8)
+        }
+        .padding(20)
+        #else
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                monthHeader
+                grid.card(padding: 12)
+                dayCard
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 30)
+        }
+        #endif
+    }
+
+    /// Mac: big day boxes with event names; click to select, double-click to add.
+    private var macGrid: some View {
+        let cells = MonthGrid.cells(for: month)
+        let rows = Int((Double(cells.count) / 7).rounded(.up))
+        return VStack(spacing: 6) {
+            HStack(spacing: 6) {
+                ForEach(Array(MonthGrid.weekdaySymbols().enumerated()), id: \.offset) { _, symbol in
+                    Text(symbol)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Palette.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 6)
+                }
+            }
+            Grid(horizontalSpacing: 6, verticalSpacing: 6) {
+                ForEach(0..<rows, id: \.self) { row in
+                    GridRow {
+                        ForEach(0..<7, id: \.self) { col in
+                            let index = row * 7 + col
+                            if index < cells.count, let day = cells[index] {
+                                macDayCell(day)
+                            } else {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Palette.card2.opacity(0.5))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func macDayCell(_ day: Date) -> some View {
+        let cal = Calendar.current
+        let isSelected = cal.isDate(day, inSameDayAs: selected)
+        let isToday = cal.isDateInToday(day)
+        let dayEvents = MonthGrid.events(on: day, from: events)
+        let type = planner.type(for: day)
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack {
+                Text(day.formatted(.dateTime.day()))
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(isToday ? Palette.onAccent : Palette.ink)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(isToday ? Palette.commute : Color.clear))
+                Spacer(minLength: 0)
+                if let type {
+                    Capsule().fill(type.color.opacity(0.6)).frame(width: 14, height: 4)
+                }
+            }
+            ForEach(Array(dayEvents.prefix(3).enumerated()), id: \.offset) { _, event in
+                Text(event.title)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Palette.onAccent)
+                    .lineLimit(1)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(event.kind.category.color, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            }
+            if dayEvents.count > 3 {
+                Text("+\(dayEvents.count - 3) more")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Palette.muted)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(6)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Palette.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Palette.commute, lineWidth: 2)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            selected = cal.startOfDay(for: day)
+            newEventDay = DayRef(date: selected)
+        }
+        .onTapGesture {
+            selected = cal.startOfDay(for: day)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 
     private var monthHeader: some View {

@@ -47,45 +47,47 @@ struct TodayView: View {
         let todayClosed = builder.score(for: .now).isClosed
         let streaks = builder.streaks()
         TimelineView(.everyMinute) { tl in
+            #if os(macOS)
+            HStack(alignment: .top, spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        header
+                        WeekStrip(selected: $selectedDay, planner: planner)
+                        timeline(now: tl.date)
+                    }
+                    .padding(20)
+                }
+                .frame(maxWidth: .infinity)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        sideColumn(now: tl.date, dayScore: dayScore, streaks: streaks)
+                    }
+                    .padding(.vertical, 20)
+                    .padding(.trailing, 20)
+                }
+                .frame(width: 370)
+            }
+            .background(Palette.bg.ignoresSafeArea())
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button {
+                        showVoice = true
+                    } label: {
+                        Label("Plan by voice", systemImage: "mic")
+                    }
+                    Button {
+                        showNewEvent = true
+                    } label: {
+                        Label("New event", systemImage: "plus")
+                    }
+                }
+            }
+            #else
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     header
                     WeekStrip(selected: $selectedDay, planner: planner)
-                    if Calendar.current.isDateInToday(selectedDay) {
-                        NowCard(items: WidgetSync.timelineItems(planner: planner, plans: plans, checks: checks,
-                                                                events: events, now: tl.date, days: 2),
-                                now: tl.date) { item in
-                            markDone(item)
-                        }
-                        CheckInCard(entries: journal, meals: food, now: tl.date,
-                                    onOpenJournal: { showJournal = true },
-                                    onPhoto: { data in checkInPhoto = JournalView.PhotoDraft(data: data) })
-                    }
-                    scoreSection(dayScore, streaks: streaks)
-                    statsRow
-                    goalsRow
-                    if Calendar.current.isDateInToday(selectedDay),
-                       Calendar.current.component(.weekday, from: tl.date) == 1 {
-                        Button {
-                            showReview = true
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "sparkles")
-                                Text("Your week recap is ready")
-                                    .font(.subheadline.weight(.bold))
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.caption.weight(.bold))
-                            }
-                            .foregroundStyle(Palette.foodText)
-                            .padding(14)
-                            .background(Palette.foodTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if Calendar.current.isDateInToday(selectedDay),
-                       Calendar.current.component(.hour, from: tl.date) >= 17 {
-                        tomorrowCard(now: tl.date)
-                    }
+                    sideColumn(now: tl.date, dayScore: dayScore, streaks: streaks)
                     timeline(now: tl.date)
                 }
                 .padding(.horizontal, 16)
@@ -121,6 +123,7 @@ struct TodayView: View {
                 }
                 .padding(20)
             }
+            #endif
         }
         .sheet(isPresented: $showWeekPlan) {
             WeekPlanView()
@@ -173,6 +176,50 @@ struct TodayView: View {
     }
 
     // MARK: Score
+
+    /// Now, check-in, score, stats and nudges. Under the week strip on iPhone; its own column on the Mac.
+    @ViewBuilder
+    private func sideColumn(now: Date, dayScore: DayScore, streaks: [ScoreBuilder.StreakSummary]) -> some View {
+        if Calendar.current.isDateInToday(selectedDay) {
+            NowCard(items: WidgetSync.timelineItems(planner: planner, plans: plans, checks: checks,
+                                                    events: events, now: now, days: 2),
+                    now: now) { item in
+                markDone(item)
+            }
+            CheckInCard(entries: journal, meals: food, now: now,
+                        onOpenJournal: { showJournal = true },
+                        onPhoto: { data in checkInPhoto = JournalView.PhotoDraft(data: data) })
+        }
+        scoreSection(dayScore, streaks: streaks)
+        statsRow
+        goalsRow
+        if Calendar.current.isDateInToday(selectedDay),
+           Calendar.current.component(.weekday, from: now) == 1 {
+            recapBanner
+        }
+        if Calendar.current.isDateInToday(selectedDay),
+           Calendar.current.component(.hour, from: now) >= 17 {
+            tomorrowCard(now: now)
+        }
+    }
+
+    private var recapBanner: some View {
+        Button {
+            showReview = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                Text("Your week recap is ready")
+                    .font(.subheadline.weight(.bold))
+                Spacer()
+                Image(systemName: "chevron.right").font(.caption.weight(.bold))
+            }
+            .foregroundStyle(Palette.foodText)
+            .padding(14)
+            .background(Palette.foodTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
 
     private func scoreSection(_ score: DayScore, streaks: [ScoreBuilder.StreakSummary]) -> some View {
         let showGoal = !weekGoal.isEmpty
