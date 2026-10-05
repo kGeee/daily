@@ -74,7 +74,7 @@ struct RestaurantSearchSheet: View {
             .padding(.top, 8)
             .background(Palette.bg.ignoresSafeArea())
             .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

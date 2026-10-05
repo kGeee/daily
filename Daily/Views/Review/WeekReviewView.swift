@@ -117,7 +117,7 @@ struct WeekReviewView: View {
             }
             .background(Palette.bg.ignoresSafeArea())
             .navigationTitle("Week in review")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

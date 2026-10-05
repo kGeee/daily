@@ -132,7 +132,7 @@ struct RecapView: View {
                 gymSlide.tag(2)
                 nextSlide.tag(3)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+            .pagedTabViewStyle()
             header
         }
         .sensoryFeedback(.selection, trigger: page)
@@ -390,7 +390,7 @@ struct RecapView: View {
     private func renderShareImage() {
         let renderer = ImageRenderer(content: RecapShareCard(recap: recap))
         renderer.scale = 3
-        if let ui = renderer.uiImage { shareImage = Image(uiImage: ui) }
+        if let cg = renderer.cgImage { shareImage = Image(decorative: cg, scale: renderer.scale) }
     }
 }
 

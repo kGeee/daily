@@ -74,7 +74,7 @@ struct WeekPlanView: View {
                 AIPrepPlannerView(days: days)
             }
             .navigationTitle("Plan the week")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

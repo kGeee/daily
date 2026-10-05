@@ -352,7 +352,7 @@ struct FocusView: View {
                 }
             }
             .navigationTitle("Timer")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { showSettings = false }

@@ -208,7 +208,7 @@ struct SettingsView: View {
                         Text("Body weight")
                         Spacer()
                         TextField("lb", value: $bodyWeight, format: .number)
-                            .keyboardType(.decimalPad)
+                            .platformKeyboard(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 70)
                         Text("lb").foregroundStyle(Palette.muted)
@@ -231,7 +231,7 @@ struct SettingsView: View {
 
                 Section {
                     SecureField("Anthropic API key", text: $apiKey)
-                        .textInputAutocapitalization(.never)
+                        .noAutocapitalization()
                         .autocorrectionDisabled()
                         .onChange(of: apiKey) { _, newValue in
                             Keychain.save(newValue)
@@ -254,13 +254,13 @@ struct SettingsView: View {
                         Text("Google").tag(MapsApp.google.rawValue)
                     }
                     SecureField("Google Places API key", text: $googleKey)
-                        .textInputAutocapitalization(.never)
+                        .noAutocapitalization()
                         .autocorrectionDisabled()
                         .onChange(of: googleKey) { _, newValue in
                             Keychain.save(newValue, account: PlaceSearch.googleAccount)
                         }
                     SecureField("Yelp API key", text: $yelpKey)
-                        .textInputAutocapitalization(.never)
+                        .noAutocapitalization()
                         .autocorrectionDisabled()
                         .onChange(of: yelpKey) { _, newValue in
                             Keychain.save(newValue, account: PlaceSearch.yelpAccount)
@@ -316,14 +316,14 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }
         }
-        .fullScreenCover(isPresented: $showSetup) {
+        .fullScreenSheet(isPresented: $showSetup) {
             SetupView { showSetup = false }
         }
         .onDisappear { revision += 1 }

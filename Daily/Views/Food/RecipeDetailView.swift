@@ -87,7 +87,7 @@ struct RecipeDetailView: View {
                 .padding(16)
             }
             .background(Palette.bg.ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
@@ -96,7 +96,7 @@ struct RecipeDetailView: View {
                     Button("Edit") { editing = true }
                 }
             }
-            .fullScreenCover(isPresented: $cooking) {
+            .fullScreenSheet(isPresented: $cooking) {
                 CookModeView(recipe: recipe)
             }
             .sheet(isPresented: $editing) {
@@ -219,8 +219,8 @@ struct ImportRecipeView: View {
 
                 Section {
                     TextField("Instagram reel link", text: $link)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
+                        .platformKeyboard(.url)
+                        .noAutocapitalization()
                         .autocorrectionDisabled()
                     Button {
                         pasteFromClipboard()
@@ -295,7 +295,7 @@ struct ImportRecipeView: View {
                 }
             }
             .navigationTitle("Import recipe")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -315,7 +315,7 @@ struct ImportRecipeView: View {
             var chunks: [String] = []
             for item in items {
                 if let data = try? await item.loadTransferable(type: Data.self),
-                   let image = UIImage(data: data)?.cgImage {
+                   let image = ImageTools.cgImage(from: data) {
                     let found = await ScreenshotText.recognize(in: image)
                     if !found.isEmpty { chunks.append(found) }
                 }
@@ -333,7 +333,7 @@ struct ImportRecipeView: View {
     }
 
     private func pasteFromClipboard() {
-        guard let pasted = UIPasteboard.general.string else { return }
+        guard let pasted = Platform.pasteboardString() else { return }
         if let url = InstagramFetcher.firstURL(in: pasted) {
             link = url.absoluteString
             let remainder = pasted.replacingOccurrences(of: url.absoluteString, with: "")

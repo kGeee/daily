@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 
+#if os(iOS)
 @main
 struct DailyApp: App {
     var body: some Scene {
@@ -10,8 +11,31 @@ struct DailyApp: App {
         .modelContainer(DataStore.shared)
     }
 }
+#endif
 
+/// The iPhone app: tabs, plus everything that runs in the background.
 struct RootView: View {
+    var body: some View {
+        TabView {
+            TodayView()
+                .tabItem { Label("Today", systemImage: "clock") }
+            CommuteView()
+                .tabItem { Label("Commute", systemImage: "bus") }
+            GymView()
+                .tabItem { Label("Gym", systemImage: "dumbbell") }
+            FoodView()
+                .tabItem { Label("Food", systemImage: "fork.knife") }
+            FocusView()
+                .tabItem { Label("Focus", systemImage: "timer") }
+        }
+        .tint(Palette.commute)
+        .modifier(AppLifecycle())
+    }
+}
+
+/// Work shared by the iPhone and Mac windows: merging widget taps, keeping widgets, reminders and the
+/// Lock Screen up to date, cleaning sync duplicates, shared imports, and first-run setup.
+struct AppLifecycle: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var context
     @Query private var overrides: [DayTypeOverride]
@@ -45,20 +69,8 @@ struct RootView: View {
         return "\(reminderKey)|\(w)|\(f)|\(c)|\(plans.count)|\(k)"
     }
 
-    var body: some View {
-        TabView {
-            TodayView()
-                .tabItem { Label("Today", systemImage: "clock") }
-            CommuteView()
-                .tabItem { Label("Commute", systemImage: "bus") }
-            GymView()
-                .tabItem { Label("Gym", systemImage: "dumbbell") }
-            FoodView()
-                .tabItem { Label("Food", systemImage: "fork.knife") }
-            FocusView()
-                .tabItem { Label("Focus", systemImage: "timer") }
-        }
-        .tint(Palette.commute)
+    func body(content: Content) -> some View {
+        content
         .task {
             appBecameActive()
             await refreshReminders()
@@ -86,7 +98,7 @@ struct RootView: View {
         .sheet(isPresented: $addingEvent) {
             EventEditor(event: nil, defaultDay: Date())
         }
-        .fullScreenCover(isPresented: $showSetup) {
+        .fullScreenSheet(isPresented: $showSetup) {
             SetupView {
                 UserDefaults.standard.set(true, forKey: Setup.doneKey)
                 showSetup = false

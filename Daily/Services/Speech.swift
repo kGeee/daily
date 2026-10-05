@@ -42,9 +42,11 @@ final class SpeechRecognizer: ObservableObject {
         }
 
         do {
+            #if os(iOS)
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.record, mode: .measurement, options: .duckOthers)
             try session.setActive(true, options: .notifyOthersOnDeactivation)
+            #endif
 
             let engine = AVAudioEngine()
             let request = SFSpeechAudioBufferRecognitionRequest()
@@ -91,7 +93,9 @@ final class SpeechRecognizer: ObservableObject {
         task = nil
         isListening = false
         level = 0
+        #if os(iOS)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
     nonisolated private static func rms(_ buffer: AVAudioPCMBuffer) -> Float {

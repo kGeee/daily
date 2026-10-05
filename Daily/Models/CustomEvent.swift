@@ -262,7 +262,7 @@ struct EventEditor: View {
                 DetailExpandableRow(symbol: "clock.fill", tint: kind.category.color, title: timeText,
                                     expanded: $showTime) {
                     DatePicker("Time", selection: $start, displayedComponents: .hourAndMinute)
-                        .datePickerStyle(.wheel)
+                        .wheelDatePickerStyle()
                         .labelsHidden()
                         .frame(maxWidth: .infinity)
                 }

@@ -1,7 +1,9 @@
 import Foundation
 import SwiftData
 import WidgetKit
+#if canImport(ActivityKit)
 import ActivityKit
+#endif
 
 /// Keeps widgets and the lock-screen countdown in step with the app's data.
 enum WidgetSync {
@@ -114,8 +116,9 @@ enum WidgetSync {
         }
     }
 
-    // MARK: Live Activity
+    // MARK: Live Activity (iPhone only)
 
+    #if canImport(ActivityKit)
     static var canShowLiveActivities: Bool {
         ActivityAuthorizationInfo().areActivitiesEnabled
     }
@@ -137,4 +140,9 @@ enum WidgetSync {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
     }
+    #else
+    static var canShowLiveActivities: Bool { false }
+    static func startCountdown(title: String, subtitle: String, departure: Date, leaveBy: Date, symbol: String) async {}
+    static func endFinishedCountdowns() async {}
+    #endif
 }

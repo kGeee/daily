@@ -1,30 +1,41 @@
 import Foundation
+#if canImport(ActivityKit)
 import ActivityKit
+#endif
 import AppIntents
 import WidgetKit
 import UserNotifications
 
 /// The Lock Screen / Dynamic Island card for whatever you're doing right now.
+/// (Live Activities are iPhone only; on the Mac the same content drives the menu bar.)
+#if canImport(ActivityKit)
 struct NowAttributes: ActivityAttributes {
-    struct ContentState: Codable, Hashable {
-        /// Timeline item id (dayKey|blockID), used by the Done button.
-        var itemID: String
-        var title: String
-        var subtitle: String
-        var symbol: String
-        /// commute, gym, food, sleep, work, general
-        var category: String
-        var start: Date
-        /// When it ends (or, when `isUpcoming`, when it starts).
-        var end: Date
-        /// Nothing is on right now; this is the next thing, counting down to its start.
-        var isUpcoming: Bool
-        var nextTitle: String?
-        var nextSymbol: String?
-        var nextStart: Date?
-        /// Set while a pomodoro is paused: seconds left, shown instead of a running timer.
-        var pausedRemaining: Double? = nil
-    }
+    typealias ContentState = NowContentState
+}
+#else
+struct NowAttributes {
+    typealias ContentState = NowContentState
+}
+#endif
+
+struct NowContentState: Codable, Hashable {
+    /// Timeline item id (dayKey|blockID), used by the Done button.
+    var itemID: String
+    var title: String
+    var subtitle: String
+    var symbol: String
+    /// commute, gym, food, sleep, work, general
+    var category: String
+    var start: Date
+    /// When it ends (or, when `isUpcoming`, when it starts).
+    var end: Date
+    /// Nothing is on right now; this is the next thing, counting down to its start.
+    var isUpcoming: Bool
+    var nextTitle: String?
+    var nextSymbol: String?
+    var nextStart: Date?
+    /// Set while a pomodoro is paused: seconds left, shown instead of a running timer.
+    var pausedRemaining: Double? = nil
 }
 
 /// Starts, updates and ends the "Now" Live Activity from the shared timeline.
@@ -67,6 +78,7 @@ enum NowActivity {
         return nil
     }
 
+    #if canImport(ActivityKit)
     static var isRunning: Bool { !Activity<NowAttributes>.activities.isEmpty }
 
     /// Brings the Live Activity in line with the timeline. Call whenever the timeline or check-offs change.
@@ -88,7 +100,13 @@ enum NowActivity {
             _ = try? Activity.request(attributes: NowAttributes(), content: content, pushType: nil)
         }
     }
+    #else
+    static var isRunning: Bool { false }
+    static func sync(at date: Date = Date()) async {}
+    #endif
 }
+
+#if canImport(ActivityKit)
 
 /// "Done" on the Lock Screen card: checks the item off and moves the card on to what's next.
 struct NowDoneIntent: LiveActivityIntent {
@@ -129,3 +147,4 @@ struct NowRefreshIntent: LiveActivityIntent {
         return .result()
     }
 }
+#endif

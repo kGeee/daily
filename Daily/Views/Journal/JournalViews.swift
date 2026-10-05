@@ -60,7 +60,7 @@ struct CheckInSheet: View {
             .scrollDismissesKeyboard(.interactively)
             .background(Palette.bg.ignoresSafeArea())
             .navigationTitle(entry == nil ? "Check-in · " + date.formatted(date: .omitted, time: .shortened) : "Check-in")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

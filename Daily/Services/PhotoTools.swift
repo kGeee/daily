@@ -1,10 +1,52 @@
 import SwiftUI
 import PhotosUI
+import ImageIO
+import UniformTypeIdentifiers
+#if canImport(UIKit)
 import UIKit
+#endif
 
-/// Shrinks photos before saving so the journal stays small.
+/// Shrinks photos before saving so the journal stays small. Works from image data with ImageIO,
+/// so it's the same on iPhone and Mac (and respects the photo's orientation).
 enum ImageTools {
-    /// JPEG no bigger than `maxDimension` on its long side.
+    /// A CGImage no bigger than `maxDimension` on its long side, upright.
+    static func cgImage(from data: Data, maxDimension: CGFloat? = nil) -> CGImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        var options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        if let maxDimension { options[kCGImageSourceThumbnailMaxPixelSize] = Int(maxDimension) }
+        if maxDimension == nil, let full = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+            // Full size: still go through the thumbnail path so orientation is applied.
+            options[kCGImageSourceThumbnailMaxPixelSize] = max(full.width, full.height)
+        }
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+    }
+
+    static func jpeg(_ image: CGImage, quality: CGFloat) -> Data? {
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(out as CFMutableData, UTType.jpeg.identifier as CFString, 1, nil) else {
+            return nil
+        }
+        CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return out as Data
+    }
+
+    /// JPEG no bigger than 1600px on its long side.
+    static func jpeg(fromData data: Data, maxDimension: CGFloat = 1600, quality: CGFloat = 0.75) -> Data? {
+        cgImage(from: data, maxDimension: maxDimension).flatMap { jpeg($0, quality: quality) }
+    }
+
+    /// A smaller copy to send to the AI (plenty to read a plate, and cheaper).
+    static func forAI(_ data: Data) -> Data? {
+        jpeg(fromData: data, maxDimension: 1024, quality: 0.7)
+    }
+
+    #if canImport(UIKit)
+    /// For camera shots, which arrive as a UIImage.
     static func jpeg(from image: UIImage, maxDimension: CGFloat = 1600, quality: CGFloat = 0.75) -> Data? {
         let size = image.size
         let longSide = max(size.width, size.height)
@@ -18,17 +60,10 @@ enum ImageTools {
         }
         return resized.jpegData(compressionQuality: quality)
     }
-
-    static func jpeg(fromData data: Data) -> Data? {
-        UIImage(data: data).flatMap { jpeg(from: $0) }
-    }
-
-    /// A smaller copy to send to the AI (plenty to read a plate, and cheaper).
-    static func forAI(_ data: Data) -> Data? {
-        UIImage(data: data).flatMap { jpeg(from: $0, maxDimension: 1024, quality: 0.7) }
-    }
+    #endif
 }
 
+#if canImport(UIKit)
 /// The camera, wrapped for SwiftUI. Falls back to nothing on devices without one (the simulator).
 struct CameraPicker: UIViewControllerRepresentable {
     @Binding var isPresented: Bool
@@ -63,19 +98,25 @@ struct CameraPicker: UIViewControllerRepresentable {
         }
     }
 }
+#else
+/// No camera picker on the Mac; photos come from the library or a dropped file.
+enum CameraPicker {
+    static var isAvailable: Bool { false }
+}
+#endif
 
 /// A photo from saved data, shrunk to a thumbnail once it's loaded.
 struct PhotoThumbnail: View {
     let data: Data
     var maxPixel: CGFloat = 400
 
-    @State private var image: UIImage?
+    @State private var image: CGImage?
 
     var body: some View {
         ZStack {
             Rectangle().fill(Palette.card2)
             if let image {
-                Image(uiImage: image)
+                Image(decorative: image, scale: 1)
                     .resizable()
                     .scaledToFill()
             } else {
@@ -85,16 +126,8 @@ struct PhotoThumbnail: View {
         }
         .clipped()
         .task(id: data.count) {
-            let source = UIImage(data: data)
-            image = source?.preparingThumbnail(of: thumbnailSize(for: source?.size ?? .zero)) ?? source
+            image = ImageTools.cgImage(from: data, maxDimension: maxPixel)
         }
-    }
-
-    private func thumbnailSize(for size: CGSize) -> CGSize {
-        let longSide = max(size.width, size.height)
-        guard longSide > maxPixel, longSide > 0 else { return size }
-        let scale = maxPixel / longSide
-        return CGSize(width: size.width * scale, height: size.height * scale)
     }
 }
 
@@ -123,12 +156,14 @@ struct PhotoSourceButtons: View {
             }
             .buttonStyle(.plain)
         }
-        .fullScreenCover(isPresented: $showCamera) {
+        #if canImport(UIKit)
+        .fullScreenSheet(isPresented: $showCamera) {
             CameraPicker(isPresented: $showCamera) { image in
                 if let data = ImageTools.jpeg(from: image) { onPhoto(data) }
             }
             .ignoresSafeArea()
         }
+        #endif
         .onChange(of: libraryItem) { _, item in
             guard let item else { return }
             Task {

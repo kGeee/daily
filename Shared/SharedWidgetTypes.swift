@@ -1,9 +1,12 @@
 import Foundation
+#if canImport(ActivityKit)
 import ActivityKit
+#endif
 import AppIntents
 import WidgetKit
 
-/// The lock-screen / Dynamic Island countdown for your next departure.
+#if canImport(ActivityKit)
+/// The lock-screen / Dynamic Island countdown for your next departure (iPhone only).
 struct DepartureAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         var title: String
@@ -13,6 +16,7 @@ struct DepartureAttributes: ActivityAttributes {
         var symbol: String
     }
 }
+#endif
 
 /// "+8 oz" button on the water widget. Runs without opening the app.
 struct AddWaterIntent: AppIntent {

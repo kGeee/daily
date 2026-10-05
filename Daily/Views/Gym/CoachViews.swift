@@ -324,7 +324,7 @@ struct WorkoutSummarySheet: View {
                                 get: { session.caloriesBurned ?? 0 },
                                 set: { session.caloriesBurned = $0 }
                             ), format: .number)
-                            .keyboardType(.numberPad)
+                            .platformKeyboard(.numberPad)
                             .font(.system(size: 22, weight: .heavy))
                             .foregroundStyle(Palette.gymText)
                             .fixedSize()

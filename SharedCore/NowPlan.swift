@@ -62,3 +62,28 @@ enum NowPlan {
         return Array(Set(all)).sorted()
     }
 }
+
+extension NowPlan {
+    /// "45m", "1h 20m".
+    static func shortDuration(minutes: Int) -> String {
+        if minutes >= 60 {
+            let h = minutes / 60, m = minutes % 60
+            return m == 0 ? "\(h)h" : "\(h)h \(m)m"
+        }
+        return "\(max(minutes, 0))m"
+    }
+
+    /// Text for the Mac menu bar: "Groceries · 32m" while something's on, "Gym in 45m" when it's next
+    /// within the upcoming window, or nil to show just the icon.
+    static func menuBarTitle(for state: State, at date: Date, maxTitle: Int = 18) -> String? {
+        func clip(_ s: String) -> String { s.count > maxTitle ? String(s.prefix(maxTitle - 1)) + "…" : s }
+        if let current = state.current {
+            return clip(current.title) + " · " + shortDuration(minutes: minutesLeft(in: current, at: date))
+        }
+        if let next = state.next, next.start.timeIntervalSince(date) <= upcomingWindow {
+            let minutes = Int((next.start.timeIntervalSince(date) / 60).rounded(.up))
+            return clip(next.title) + " in " + shortDuration(minutes: minutes)
+        }
+        return nil
+    }
+}

@@ -613,7 +613,7 @@ struct LogMealSheet: View {
                                     value: Calendar.current.isDateInToday(time) ? "Today" : nil,
                                     expanded: $showTime) {
                     DatePicker("When", selection: $time)
-                        .datePickerStyle(.wheel)
+                        .wheelDatePickerStyle()
                         .labelsHidden()
                         .frame(maxWidth: .infinity)
                 }
@@ -729,7 +729,7 @@ struct LogMealSheet: View {
                 .foregroundStyle(Palette.muted)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 TextField("—", text: text)
-                    .keyboardType(.numberPad)
+                    .platformKeyboard(.numberPad)
                     .font(.system(size: 22, weight: .heavy))
                     .foregroundStyle(Palette.ink)
                 Text(unit)

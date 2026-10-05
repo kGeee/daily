@@ -36,13 +36,13 @@ struct CookModeView: View {
                                 .tag(i)
                         }
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .pagedTabViewStyle()
                     controls
                 }
             }
             .background(Palette.bg.ignoresSafeArea())
             .navigationTitle(recipe.name)
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
@@ -67,7 +67,7 @@ struct CookModeView: View {
                 NavigationStack {
                     List(recipe.ingredients, id: \.self) { Text($0) }
                         .navigationTitle("Ingredients")
-                        .navigationBarTitleDisplayMode(.inline)
+                        .inlineNavigationTitle()
                         .toolbar {
                             ToolbarItem(placement: .confirmationAction) {
                                 Button("Done") { showIngredients = false }
@@ -77,9 +77,9 @@ struct CookModeView: View {
                 .presentationDetents([.medium, .large])
             }
         }
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
+        .onAppear { Platform.keepScreenOn(true) }
         .onDisappear {
-            UIApplication.shared.isIdleTimerDisabled = false
+            Platform.keepScreenOn(false)
             synthesizer.stopSpeaking(at: .immediate)
         }
         .onChange(of: index) { _, newValue in

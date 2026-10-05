@@ -86,7 +86,7 @@ struct BlockDetailSheet: View {
                                             value: hasOverride ? "Changed" : nil, expanded: $showTime) {
                             VStack(spacing: 10) {
                                 DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
-                                    .datePickerStyle(.wheel)
+                                    .wheelDatePickerStyle()
                                     .labelsHidden()
                                     .frame(maxWidth: .infinity)
                                 DetailPrimaryButton(title: "Move to " + time.formatted(date: .omitted, time: .shortened)
@@ -170,7 +170,9 @@ struct BlockDetailSheet: View {
                     }
                 }
             }
+            #if os(iOS)
             .toolbar(.hidden, for: .navigationBar)
+            #endif
         }
         .sheet(item: $logDraft) { draft in
             LogMealSheet(draft: draft)

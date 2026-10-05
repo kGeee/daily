@@ -454,11 +454,11 @@ struct AddRecipeSheet: View {
                     HStack {
                         Text("Makes")
                         TextField("4", value: $servings, format: .number)
-                            .keyboardType(.numberPad)
+                            .platformKeyboard(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 60)
                         TextField("servings", text: $yieldUnit)
-                            .textInputAutocapitalization(.never)
+                            .noAutocapitalization()
                     }
                     if !yieldUnit.trimmingCharacters(in: .whitespaces).isEmpty {
                         Stepper(value: $unitsPerMeal, in: 0.5...100, step: unitsPerMeal < 3 ? 0.5 : 1) {
@@ -512,7 +512,7 @@ struct AddRecipeSheet: View {
                 }
             }
             .navigationTitle(recipe == nil ? "New recipe" : "Edit recipe")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -557,7 +557,7 @@ struct AddRecipeSheet: View {
             Text(title)
             Spacer()
             TextField("—", text: text)
-                .keyboardType(.numberPad)
+                .platformKeyboard(.numberPad)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 90)
         }

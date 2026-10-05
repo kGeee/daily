@@ -155,7 +155,7 @@ struct AIPrepPlannerView: View {
                 }
             }
             .navigationTitle("Plan my prep")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(applied ? "Done" : "Cancel") { dismiss() }

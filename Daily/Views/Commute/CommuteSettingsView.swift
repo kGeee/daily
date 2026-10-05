@@ -131,7 +131,7 @@ struct CommuteSettingsView: View {
 
             Section {
                 SecureField("511.org API key", text: $key511)
-                    .textInputAutocapitalization(.never)
+                    .noAutocapitalization()
                     .autocorrectionDisabled()
                     .onChange(of: key511) { _, newValue in
                         Keychain.save(newValue, account: Keychain.fiveOneOne)
@@ -177,7 +177,7 @@ struct CommuteSettingsView: View {
             }
         }
         .navigationTitle("Commute")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
         .onDisappear { Pref.bump() }
     }
 
@@ -281,8 +281,10 @@ struct RoutineEditorView: View {
             }
         }
         .navigationTitle(type.title)
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
+        #if os(iOS)
         .toolbar { EditButton() }
+        #endif
         .onAppear { steps = Routines.steps(for: type) }
         .confirmationDialog("Reset \(type.title)?", isPresented: $confirmReset, titleVisibility: .visible) {
             Button("Reset", role: .destructive) {
@@ -408,7 +410,7 @@ struct StepEditorView: View {
             }
         }
         .navigationTitle(isNew ? "New step" : "Edit step")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
@@ -471,7 +473,7 @@ struct TimetableEditorView: View {
                               suggested: ClockTime(17, 0))
         }
         .navigationTitle(table.name)
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
         .onDisappear {
             onSave(table)
             Pref.bump()

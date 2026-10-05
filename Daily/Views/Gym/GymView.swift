@@ -368,7 +368,7 @@ struct TemplateEditor: View {
                 }
             }
             .navigationTitle(template == nil ? "New workout" : "Edit workout")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

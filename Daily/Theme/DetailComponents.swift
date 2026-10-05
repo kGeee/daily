@@ -158,6 +158,9 @@ struct DetailSheetLayout<Hero: View, Content: View>: View {
         .background(Palette.bg.ignoresSafeArea())
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(28)
+        #if os(macOS)
+        .frame(minWidth: 460, idealWidth: 520, minHeight: 600, idealHeight: 760)
+        #endif
     }
 }
 
