@@ -5,7 +5,13 @@ import Foundation
 enum SharedStore {
     static let groupID = "group.com.kgeee.daily"
 
-    static var defaults: UserDefaults { UserDefaults(suiteName: groupID) ?? .standard }
+    /// Created once. (It used to be made fresh on every access, which every "Now" card did on every redraw.)
+    #if os(macOS)
+    /// The Mac app has no widgets or extensions yet, so it keeps these in its own settings.
+    static let defaults = UserDefaults.standard
+    #else
+    static let defaults = UserDefaults(suiteName: groupID) ?? .standard
+    #endif
 
     // MARK: Snapshot the app writes for widgets
 

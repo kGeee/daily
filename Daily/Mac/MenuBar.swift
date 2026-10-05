@@ -18,36 +18,48 @@ private struct NowSource {
     }
 }
 
-/// What sits in the menu bar: an icon, plus what's on now and time left.
-struct MenuBarLabel: View {
-    var body: some View {
-        MenuBarLabelContent()
-            .modelContainer(DataStore.shared)
+/// What the menu bar shows. Worked out every 30 seconds from the timeline snapshot the app keeps
+/// for widgets, so the status item itself never runs database queries.
+@Observable
+@MainActor
+final class MenuBarModel {
+    private(set) var title: String?
+    private(set) var symbol = "clock"
+    @ObservationIgnored private var timer: Timer?
+
+    init() {
+        refresh()
+        timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.refresh() }
+        }
+    }
+
+    func refresh(at date: Date = Date()) {
+        let state = NowPlan.state(at: date, items: SharedStore.currentItems())
+        let newTitle = NowPlan.menuBarTitle(for: state, at: date)
+        let newSymbol = state.current?.symbol ?? state.next?.symbol ?? "clock"
+        // Only touch the properties when something changed, so the status item isn't redrawn for nothing.
+        if newTitle != title { title = newTitle }
+        if newSymbol != symbol { symbol = newSymbol }
     }
 }
 
-private struct MenuBarLabelContent: View {
-    @Query private var overrides: [DayTypeOverride]
-    @Query private var plans: [MealPlan]
-    @Query private var checks: [BlockCheck]
-    @Query private var events: [CustomEvent]
-    @AppStorage("weekPattern") private var pattern = MySchedule.defaultPattern
+/// What sits in the menu bar: an icon, plus what's on now and time left.
+struct MenuBarLabel: View {
+    let model: MenuBarModel
 
     var body: some View {
-        TimelineView(.everyMinute) { tl in
-            let source = NowSource(overrides: overrides, plans: plans, checks: checks, events: events, pattern: pattern)
-            let state = NowPlan.state(at: tl.date, items: source.items(at: tl.date))
-            if let title = NowPlan.menuBarTitle(for: state, at: tl.date) {
-                Label(title, systemImage: state.current?.symbol ?? state.next?.symbol ?? "clock")
-            } else {
-                Image(systemName: "clock")
-            }
+        if let title = model.title {
+            Label(title, systemImage: model.symbol)
+        } else {
+            Image(systemName: "clock")
         }
     }
 }
 
 /// The panel that drops down from the menu bar.
 struct MenuBarPanel: View {
+    let model: MenuBarModel
     @Environment(\.modelContext) private var context
     @Environment(\.openWindow) private var openWindow
     @Query private var overrides: [DayTypeOverride]
@@ -101,6 +113,7 @@ struct MenuBarPanel: View {
             .padding(14)
             .frame(width: 320)
         }
+        .onAppear { model.refresh() }
     }
 
     private func nowRow(_ item: SharedStore.Item, at date: Date) -> some View {
@@ -159,6 +172,7 @@ struct MenuBarPanel: View {
     private func markDone(_ item: SharedStore.Item) {
         guard !checks.contains(where: { $0.dayKey == item.dayKey && $0.blockID == item.blockID }) else { return }
         context.insert(BlockCheck(dayKey: item.dayKey, blockID: item.blockID))
+        model.refresh()
     }
 }
 #endif

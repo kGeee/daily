@@ -7,19 +7,23 @@ import AppKit
 /// window, plus a menu bar item showing what's on now.
 @main
 struct DailyMacApp: App {
+    @State private var nav = MacNavigation()
+    @State private var menuBar = MenuBarModel()
+
     var body: some Scene {
-        WindowGroup("Daily", id: MacWindow.main) {
-            MacRootView()
+        // One main window (re-opened from the menu bar), so the background work runs once.
+        Window("Daily", id: MacWindow.main) {
+            MacRootView(nav: nav)
                 .frame(minWidth: 900, minHeight: 620)
         }
         .modelContainer(DataStore.shared)
-        .commands { DailyCommands() }
+        .commands { DailyCommands(nav: nav) }
 
         MenuBarExtra {
-            MenuBarPanel()
+            MenuBarPanel(model: menuBar)
                 .modelContainer(DataStore.shared)
         } label: {
-            MenuBarLabel()
+            MenuBarLabel(model: menuBar)
         }
         .menuBarExtraStyle(.window)
 
@@ -29,6 +33,19 @@ struct DailyMacApp: App {
                 .frame(width: 560, height: 680)
         }
     }
+}
+
+/// Which section the window shows, and the New Event sheet. Shared by the window and the menus
+/// (passed directly rather than through focused values, which rebuilt the menus on every redraw).
+@Observable
+@MainActor
+final class MacNavigation {
+    private static let key = "mac.section"
+
+    var section: MacSection? = MacSection(rawValue: UserDefaults.standard.string(forKey: MacNavigation.key) ?? "") ?? .today {
+        didSet { UserDefaults.standard.set((section ?? .today).rawValue, forKey: Self.key) }
+    }
+    var newEvent = false
 }
 
 enum MacWindow {
@@ -69,17 +86,11 @@ enum MacSection: String, CaseIterable, Identifiable {
 }
 
 struct MacRootView: View {
-    @SceneStorage("mac.section") private var sectionRaw = MacSection.today.rawValue
-    @State private var newEvent = false
-
-    private var section: Binding<MacSection?> {
-        Binding(get: { MacSection(rawValue: sectionRaw) ?? .today },
-                set: { sectionRaw = ($0 ?? .today).rawValue })
-    }
+    @Bindable var nav: MacNavigation
 
     var body: some View {
         NavigationSplitView {
-            List(selection: section) {
+            List(selection: $nav.section) {
                 Section("Daily") {
                     ForEach(MacSection.allCases) { s in
                         Label(s.title, systemImage: s.symbol).tag(s)
@@ -89,14 +100,12 @@ struct MacRootView: View {
             .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
             .safeAreaInset(edge: .bottom) { SidebarScore().padding(10) }
         } detail: {
-            detail(for: section.wrappedValue ?? .today)
-                .id(sectionRaw)
+            detail(for: nav.section ?? .today)
+                .id(nav.section ?? .today)
         }
         .tint(Palette.commute)
         .modifier(AppLifecycle())
-        .focusedSceneValue(\.macSection, section)
-        .focusedSceneValue(\.macNewEvent, $newEvent)
-        .sheet(isPresented: $newEvent) {
+        .sheet(isPresented: $nav.newEvent) {
             EventEditor(event: nil, defaultDay: Date())
                 .frame(minWidth: 460, minHeight: 640)
         }
@@ -151,35 +160,18 @@ private struct SidebarScore: View {
 
 // MARK: - Menu commands
 
-struct MacSectionKey: FocusedValueKey { typealias Value = Binding<MacSection?> }
-struct MacNewEventKey: FocusedValueKey { typealias Value = Binding<Bool> }
-
-extension FocusedValues {
-    var macSection: Binding<MacSection?>? {
-        get { self[MacSectionKey.self] }
-        set { self[MacSectionKey.self] = newValue }
-    }
-    var macNewEvent: Binding<Bool>? {
-        get { self[MacNewEventKey.self] }
-        set { self[MacNewEventKey.self] = newValue }
-    }
-}
-
 struct DailyCommands: Commands {
-    @FocusedValue(\.macSection) private var section
-    @FocusedValue(\.macNewEvent) private var newEvent
+    let nav: MacNavigation
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Event") { newEvent?.wrappedValue = true }
+            Button("New Event") { nav.newEvent = true }
                 .keyboardShortcut("n")
-                .disabled(newEvent == nil)
         }
         CommandMenu("Go") {
             ForEach(MacSection.allCases) { s in
-                Button(s.title) { section?.wrappedValue = s }
+                Button(s.title) { nav.section = s }
                     .keyboardShortcut(s.shortcut)
-                    .disabled(section == nil)
             }
         }
     }
