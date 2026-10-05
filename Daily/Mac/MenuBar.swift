@@ -11,6 +11,7 @@ private struct NowSource {
     var events: [CustomEvent]
     var pattern: String
 
+    @MainActor
     func items(at date: Date) -> [SharedStore.Item] {
         WidgetSync.timelineItems(planner: DayPlanner(pattern: pattern, overrides: overrides), plans: plans,
                                  checks: checks, events: events, now: date, days: 2)

@@ -1,11 +1,11 @@
 import Foundation
-#if canImport(ActivityKit)
+#if os(iOS)
 import ActivityKit
 #endif
 import AppIntents
 import WidgetKit
 
-#if canImport(ActivityKit)
+#if os(iOS)
 /// The lock-screen / Dynamic Island countdown for your next departure (iPhone only).
 struct DepartureAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {

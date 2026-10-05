@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 import WidgetKit
-#if canImport(ActivityKit)
+#if os(iOS)
 import ActivityKit
 #endif
 
@@ -118,7 +118,7 @@ enum WidgetSync {
 
     // MARK: Live Activity (iPhone only)
 
-    #if canImport(ActivityKit)
+    #if os(iOS)
     static var canShowLiveActivities: Bool {
         ActivityAuthorizationInfo().areActivitiesEnabled
     }

@@ -1,5 +1,5 @@
 import Foundation
-#if canImport(ActivityKit)
+#if os(iOS)
 import ActivityKit
 #endif
 import AppIntents
@@ -8,7 +8,7 @@ import UserNotifications
 
 /// The Lock Screen / Dynamic Island card for whatever you're doing right now.
 /// (Live Activities are iPhone only; on the Mac the same content drives the menu bar.)
-#if canImport(ActivityKit)
+#if os(iOS)
 struct NowAttributes: ActivityAttributes {
     typealias ContentState = NowContentState
 }
@@ -78,7 +78,7 @@ enum NowActivity {
         return nil
     }
 
-    #if canImport(ActivityKit)
+    #if os(iOS)
     static var isRunning: Bool { !Activity<NowAttributes>.activities.isEmpty }
 
     /// Brings the Live Activity in line with the timeline. Call whenever the timeline or check-offs change.
@@ -106,7 +106,7 @@ enum NowActivity {
     #endif
 }
 
-#if canImport(ActivityKit)
+#if os(iOS)
 
 /// "Done" on the Lock Screen card: checks the item off and moves the card on to what's next.
 struct NowDoneIntent: LiveActivityIntent {
