@@ -10,6 +10,21 @@ extension ScoreRing {
     }
 }
 
+/// Ring thickness and spacing for a given size: thin enough that all three fit and the middle has room.
+struct RingMetrics: Equatable {
+    var stroke: CGFloat
+    var gap: CGFloat
+    /// Width of the open space inside the innermost ring.
+    var inner: CGFloat
+
+    init(size: CGFloat) {
+        stroke = max(2.5, size / 13)
+        gap = max(1.5, stroke / 4)
+        let rings = CGFloat(ScoreRing.allCases.count)
+        inner = max(0, size - 2 * (rings * stroke + (rings - 1) * gap))
+    }
+}
+
 /// Three nested rings (Move outside, Fuel, Day inside).
 struct ScoreRings<Center: View>: View {
     let score: DayScore
@@ -17,8 +32,9 @@ struct ScoreRings<Center: View>: View {
     @ViewBuilder var center: () -> Center
 
     var body: some View {
-        let stroke = max(7, size / 11)
-        let gap = max(2, stroke / 4)
+        let m = RingMetrics(size: size)
+        let stroke = m.stroke
+        let gap = m.gap
         ZStack {
             ForEach(Array(ScoreRing.allCases.enumerated()), id: \.offset) { index, ring in
                 let inset = CGFloat(index) * (stroke + gap)
@@ -32,7 +48,9 @@ struct ScoreRings<Center: View>: View {
                     .padding(inset + stroke / 2)
                     .animation(.snappy(duration: 0.6), value: score.value(ring))
             }
+            // Whatever goes in the middle is kept inside the innermost ring.
             center()
+                .frame(maxWidth: m.inner * 0.86, maxHeight: m.inner * 0.86)
         }
         .frame(width: size, height: size)
     }
@@ -63,16 +81,20 @@ struct DayScoreCard: View {
         VStack(spacing: 10) {
             Button(action: onOpenScore) {
                 HStack(spacing: 16) {
-                    ScoreRings(score: score, size: 118) {
-                        VStack(spacing: 0) {
+                    VStack(spacing: 6) {
+                        ScoreRings(score: score, size: 118) {
                             Text("\(score.score)")
-                                .font(.system(size: 24, weight: .heavy))
+                                .font(.system(size: 26, weight: .heavy))
                                 .foregroundStyle(Palette.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
                                 .contentTransition(.numericText())
-                            Text("DAY SCORE")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(Palette.muted)
                         }
+                        Text("DAY SCORE")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.6)
+                            .foregroundStyle(Palette.muted)
+                            .fixedSize()
                     }
                     VStack(alignment: .leading, spacing: 9) {
                         ForEach(ScoreRing.allCases) { ring in
@@ -168,7 +190,13 @@ struct ScoreDetailSheet: View {
                         Text("\(score.score)")
                             .font(.system(size: 34, weight: .heavy))
                             .foregroundStyle(Palette.ink)
-                        Text("OF 100").font(.caption2.weight(.bold)).foregroundStyle(Palette.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                        Text("OF 100")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Palette.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
                 .padding(.top, 24)

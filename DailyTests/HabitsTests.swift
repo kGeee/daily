@@ -140,3 +140,17 @@ final class StreakTests: XCTestCase {
         XCTAssertEqual(options[3].title, "Close 3 days")
     }
 }
+
+final class RingMetricsTests: XCTestCase {
+    func testAllRingsFitAtEverySizeWeUse() {
+        for size in [34.0, 40, 96, 118, 150, 170] as [CGFloat] {
+            let m = RingMetrics(size: size)
+            XCTAssertGreaterThan(m.inner, 0, "size \(size)")
+        }
+    }
+
+    func testTodayCardHasRoomForAThreeDigitScore() {
+        // "100" at 26pt heavy is about 46pt wide; the middle should fit it without shrinking much.
+        XCTAssertGreaterThanOrEqual(RingMetrics(size: 118).inner * 0.86, 44)
+    }
+}
