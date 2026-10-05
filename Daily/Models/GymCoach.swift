@@ -115,7 +115,7 @@ enum Coach {
     /// Exercises where this session's heaviest finished set beats every earlier session.
     static func newBests(in session: WorkoutSession, allSets: [SetLog]) -> [(exercise: String, weight: Double, reps: Int)] {
         var result: [(String, Double, Int)] = []
-        let mine = session.sets.filter(\.isDone)
+        let mine = session.allSets.filter(\.isDone)
         for exercise in Set(mine.map(\.exercise)).sorted() {
             guard let best = mine.filter({ $0.exercise == exercise }).max(by: { $0.weight < $1.weight }), best.weight > 0
             else { continue }
@@ -146,7 +146,7 @@ enum Coach {
                 let days = Calendar.current.dateComponents([.day], from: s.date, to: now).day ?? 0
                 var parts: [String] = []
                 for exercise in s.exercises {
-                    let sets = s.sets.filter { $0.exercise == exercise && $0.isDone }.sorted { $0.index < $1.index }
+                    let sets = s.allSets.filter { $0.exercise == exercise && $0.isDone }.sorted { $0.index < $1.index }
                     guard !sets.isEmpty else { continue }
                     parts.append(exercise + " " + sets.map { "\(format($0.weight))×\($0.reps)" }.joined(separator: ", "))
                 }
@@ -178,7 +178,7 @@ struct GymWeek {
         }
         return GymWeek(workouts: inWeek.count,
                        calories: inWeek.reduce(0) { $0 + Burn.calories(for: $1) },
-                       volume: inWeek.reduce(0) { $0 + Coach.volume($1.sets) },
+                       volume: inWeek.reduce(0) { $0 + Coach.volume($1.allSets) },
                        daily: daily)
     }
 }

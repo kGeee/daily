@@ -97,7 +97,7 @@ extension ScoreBuilder {
                          photos: Array(photos),
                          workouts: workouts.count,
                          calories: workouts.reduce(0) { $0 + Burn.calories(for: $1) },
-                         volume: workouts.reduce(0) { $0 + Coach.volume($1.sets) },
+                         volume: workouts.reduce(0) { $0 + Coach.volume($1.allSets) },
                          bestLift: bestLift,
                          focusMinutes: weekFocus.reduce(0) { $0 + $1.seconds } / 60,
                          focusRounds: weekFocus.filter(\.completed).count,

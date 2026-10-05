@@ -297,7 +297,7 @@ struct WorkoutSummarySheet: View {
 
     var body: some View {
         let minutes = Int(((session.finishedAt ?? Date()).timeIntervalSince(session.date) / 60).rounded())
-        let done = session.sets.filter(\.isDone)
+        let done = session.allSets.filter(\.isDone)
         let bests = Coach.newBests(in: session, allSets: allSets)
         ScrollView {
             VStack(spacing: 14) {

@@ -43,30 +43,30 @@ enum RestaurantFeeling: String, CaseIterable, Identifiable {
 /// A place you've eaten at (or want to try). Visits are the "Ate out" meals linked to it.
 @Model
 final class Restaurant {
-    var id: UUID
-    var name: String
-    var address: String
-    var latitude: Double?
-    var longitude: Double?
-    var cuisine: String
-    var price: String
-    var phone: String
-    var website: String
-    var yelpID: String
-    var yelpRating: Double?
-    var yelpReviews: Int?
-    var yelpURL: String
+    var id: UUID = UUID()
+    var name: String = ""
+    var address: String = ""
+    var latitude: Double? = nil
+    var longitude: Double? = nil
+    var cuisine: String = ""
+    var price: String = ""
+    var phone: String = ""
+    var website: String = ""
+    var yelpID: String = ""
+    var yelpRating: Double? = nil
+    var yelpReviews: Int? = nil
+    var yelpURL: String = ""
     var googlePlaceID: String = ""
     var googleRating: Double? = nil
     var googleReviews: Int? = nil
     var googleURL: String = ""
     /// "" until you've rated it.
-    var feelingRaw: String
+    var feelingRaw: String = ""
     /// 0 = your favorite within its feeling group.
-    var rank: Int
-    var notes: String
-    var wantToTry: Bool
-    var createdAt: Date
+    var rank: Int = 0
+    var notes: String = ""
+    var wantToTry: Bool = false
+    var createdAt: Date = Date()
 
     init(name: String, address: String = "", latitude: Double? = nil, longitude: Double? = nil,
          cuisine: String = "", price: String = "", phone: String = "", website: String = "",

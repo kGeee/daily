@@ -7,22 +7,7 @@ struct DailyApp: App {
         WindowGroup {
             RootView()
         }
-        .modelContainer(for: [
-            FoodEntry.self,
-            GroceryItem.self,
-            Recipe.self,
-            WaterEntry.self,
-            BlockCheck.self,
-            DayTypeOverride.self,
-            CustomEvent.self,
-            MealPlan.self,
-            WorkoutTemplate.self,
-            WorkoutSession.self,
-            SetLog.self,
-            FocusSession.self,
-            Restaurant.self,
-            JournalEntry.self
-        ])
+        .modelContainer(DataStore.shared)
     }
 }
 
@@ -113,6 +98,7 @@ struct RootView: View {
         WidgetSync.mergePendingWater(into: context)
         WidgetSync.mergePendingChecks(into: context, existing: checks)
         FocusController.settle(context: context)
+        Dedupe.run(in: context)
         if SharedStore.takeAddEventRequest() { addingEvent = true }
         if pendingImport == nil, pendingInvite == nil, let next = SharedStore.takePendingImports().last {
             // Invites (Partiful, Luma…) become events; anything else goes to the recipe importer.

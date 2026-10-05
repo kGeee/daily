@@ -83,6 +83,7 @@ struct TrainTimesSection: View {
 }
 
 struct SettingsView: View {
+    @AppStorage(DataStore.syncKey) private var iCloudSync = true
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @AppStorage(Pref.calorieGoal) private var calorieGoal = Pref.calorieGoalDefault
@@ -116,6 +117,13 @@ struct SettingsView: View {
     @State private var googleKey = Keychain.read(PlaceSearch.googleAccount) ?? ""
     @AppStorage(MapsApp.prefKey) private var mapsApp = MapsApp.apple.rawValue
     @AppStorage(MapsApp.searchKey) private var placeSearch = MapsApp.apple.rawValue
+
+    private var syncStatus: String {
+        switch DataStore.mode {
+        case .iCloud: return "Syncing"
+        case .local(let reason): return reason
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -267,6 +275,20 @@ struct SettingsView: View {
                     Text("Maps & restaurant ratings")
                 } footer: {
                     Text("Addresses open in the maps app you pick (Google Maps opens in its app if installed, otherwise the web). Search uses Apple Maps for free. Google search adds Google star ratings and needs a Places API (New) key; Google bills searches beyond its free monthly allowance. A Yelp key adds Yelp stars and review counts; Yelp's API is paid after a trial.")
+                }
+
+                Section {
+                    Toggle("Sync with iCloud", isOn: $iCloudSync)
+                    HStack {
+                        Text("Right now")
+                        Spacer()
+                        Text(syncStatus)
+                            .foregroundStyle(Palette.muted)
+                    }
+                } header: {
+                    Text("iCloud")
+                } footer: {
+                    Text("Keeps your meals, workouts, events, restaurants and journal the same on your iPhone and Mac, through your own iCloud. Turning it on or off takes effect the next time Daily opens.")
                 }
 
                 Section {

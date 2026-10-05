@@ -22,12 +22,12 @@ enum MealSource: String, CaseIterable, Identifiable {
 
 @Model
 final class FoodEntry {
-    var date: Date
-    var slotRaw: String
-    var name: String
-    var sourceRaw: String
-    var calories: Int?
-    var protein: Int?
+    var date: Date = Date()
+    var slotRaw: String = ""
+    var name: String = ""
+    var sourceRaw: String = ""
+    var calories: Int? = nil
+    var protein: Int? = nil
     var carbs: Int? = nil
     var fat: Int? = nil
     /// Set for meals eaten out at a saved restaurant (these are its visits).
@@ -53,12 +53,12 @@ final class FoodEntry {
 
 @Model
 final class GroceryItem {
-    var name: String
-    var quantity: String
-    var section: String
-    var trip: Int
-    var isDone: Bool
-    var createdAt: Date
+    var name: String = ""
+    var quantity: String = ""
+    var section: String = ""
+    var trip: Int = 0
+    var isDone: Bool = false
+    var createdAt: Date = Date()
 
     init(name: String, quantity: String = "", section: String, trip: Int) {
         self.name = name
@@ -72,11 +72,11 @@ final class GroceryItem {
 
 @Model
 final class Recipe {
-    var name: String
-    var servings: Int
-    var slotRaw: String
-    var note: String
-    var createdAt: Date
+    var name: String = ""
+    var servings: Int = 0
+    var slotRaw: String = ""
+    var note: String = ""
+    var createdAt: Date = Date()
     /// One ingredient per line, e.g. "2 lb chicken thighs".
     var ingredientsRaw: String = ""
     /// One step per line.
@@ -177,9 +177,9 @@ final class Recipe {
 /// What you plan to eat for a meal on a given day (a recipe name, or "Eat out").
 @Model
 final class MealPlan {
-    var dayKey: String
-    var slotRaw: String
-    var title: String
+    var dayKey: String = ""
+    var slotRaw: String = ""
+    var title: String = ""
 
     init(dayKey: String, slot: MealSlot, title: String) {
         self.dayKey = dayKey
@@ -195,8 +195,8 @@ final class MealPlan {
 
 @Model
 final class WaterEntry {
-    var date: Date
-    var ounces: Int
+    var date: Date = Date()
+    var ounces: Int = 0
 
     init(date: Date = .now, ounces: Int) {
         self.date = date
@@ -207,8 +207,8 @@ final class WaterEntry {
 /// Marks a timeline block as done on a given day.
 @Model
 final class BlockCheck {
-    var dayKey: String
-    var blockID: String
+    var dayKey: String = ""
+    var blockID: String = ""
 
     init(dayKey: String, blockID: String) {
         self.dayKey = dayKey
@@ -216,11 +216,12 @@ final class BlockCheck {
     }
 }
 
-/// A one-off change to a day's type (e.g. making today a gym day).
+/// A one-off change to a day's type (e.g. making today a gym day). One per day; iCloud sync can't
+/// enforce that, so `Dedupe` removes extras that arrive from another device.
 @Model
 final class DayTypeOverride {
-    @Attribute(.unique) var dayKey: String
-    var typeRaw: String
+    var dayKey: String = ""
+    var typeRaw: String = ""
 
     init(dayKey: String, typeRaw: String) {
         self.dayKey = dayKey

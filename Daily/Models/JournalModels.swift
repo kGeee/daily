@@ -30,11 +30,11 @@ enum Mood: String, CaseIterable, Identifiable {
 /// A photo check-in: a picture of how the day is going, with a mood and a line about it.
 @Model
 final class JournalEntry {
-    var id: UUID
-    var date: Date
+    var id: UUID = UUID()
+    var date: Date = Date()
     @Attribute(.externalStorage) var photo: Data?
-    var caption: String
-    var moodRaw: String
+    var caption: String = ""
+    var moodRaw: String = ""
 
     init(date: Date = .now, photo: Data?, caption: String = "", mood: Mood? = nil) {
         self.id = UUID()

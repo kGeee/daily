@@ -111,7 +111,7 @@ final class BackupTests: XCTestCase {
         XCTAssertEqual(try target.fetch(FetchDescriptor<FoodEntry>()).map { $0.name }, ["Burrito bowl"])
         XCTAssertEqual(try target.fetch(FetchDescriptor<MealPlan>()).count, 1)
         let sessions = try target.fetch(FetchDescriptor<WorkoutSession>())
-        XCTAssertEqual(sessions.first?.sets.first?.weight, 120)
+        XCTAssertEqual(sessions.first?.allSets.first?.weight, 120)
         XCTAssertEqual(MySchedule.proteinGoal, 150, "Settings come back too")
         resetPrefs()
     }

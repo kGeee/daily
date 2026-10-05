@@ -98,7 +98,7 @@ enum Backup {
         file.sessions = try context.fetch(FetchDescriptor<WorkoutSession>()).map { s in
             SessionDTO(date: s.date, templateName: s.templateName, exercises: s.exercisesRaw, finishedAt: s.finishedAt,
                        cardioMinutes: s.cardioMinutes, cardioNote: s.cardioNote,
-                       sets: s.sets.map { SetDTO(exercise: $0.exercise, index: $0.index, weight: $0.weight,
+                       sets: s.allSets.map { SetDTO(exercise: $0.exercise, index: $0.index, weight: $0.weight,
                                                  reps: $0.reps, isDone: $0.isDone, date: $0.date) })
         }
 

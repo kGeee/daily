@@ -207,7 +207,7 @@ struct ExerciseCard: View {
     var onSetDone: () -> Void = {}
 
     private var sets: [SetLog] {
-        session.sets.filter { $0.exercise == exercise }.sorted { $0.index < $1.index }
+        session.allSets.filter { $0.exercise == exercise }.sorted { $0.index < $1.index }
     }
 
     var body: some View {

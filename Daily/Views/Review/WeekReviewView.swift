@@ -65,7 +65,7 @@ struct WeekReviewView: View {
         s.gymPlanned = days.filter { planner.type(for: $0) == .gym }.count
         let weekSessions = sessions.filter { week.contains($0.date) && $0.finishedAt != nil }
         s.gymDone = weekSessions.count
-        s.setsDone = weekSessions.reduce(0) { $0 + $1.sets.filter { $0.isDone }.count }
+        s.setsDone = weekSessions.reduce(0) { $0 + $1.allSets.filter { $0.isDone }.count }
         s.cardioMinutes = weekSessions.reduce(0) { $0 + $1.cardioMinutes }
 
         let waterByDay = Dictionary(grouping: water.filter { week.contains($0.date) }) { cal.startOfDay(for: $0.date) }

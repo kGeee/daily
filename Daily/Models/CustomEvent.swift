@@ -54,14 +54,14 @@ enum EventKind: String, CaseIterable, Identifiable {
 /// Something you add to the timeline yourself (a dinner, an appointment, a call).
 @Model
 final class CustomEvent {
-    var id: UUID
-    var title: String
-    var note: String
-    var start: Date
-    var durationMinutes: Int
-    var kindRaw: String
-    var repeatRaw: String
-    var remind: Bool
+    var id: UUID = UUID()
+    var title: String = ""
+    var note: String = ""
+    var start: Date = Date()
+    var durationMinutes: Int = 0
+    var kindRaw: String = ""
+    var repeatRaw: String = ""
+    var remind: Bool = false
     /// The invite it came from (Partiful, Luma…), if imported.
     var link: String = ""
     var location: String = ""

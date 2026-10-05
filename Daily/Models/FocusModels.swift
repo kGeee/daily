@@ -4,12 +4,12 @@ import SwiftData
 /// One pomodoro focus round you worked (finished or stopped early, at least a minute long).
 @Model
 final class FocusSession {
-    var id: UUID
-    var label: String
-    var start: Date
-    var end: Date
-    var seconds: Int
-    var completed: Bool
+    var id: UUID = UUID()
+    var label: String = ""
+    var start: Date = Date()
+    var end: Date = Date()
+    var seconds: Int = 0
+    var completed: Bool = false
 
     init(label: String, start: Date, end: Date, seconds: Int, completed: Bool) {
         self.id = UUID()

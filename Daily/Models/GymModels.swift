@@ -3,10 +3,10 @@ import SwiftData
 
 @Model
 final class WorkoutTemplate {
-    var name: String
-    var order: Int
-    var exercisesRaw: String
-    var isCardio: Bool
+    var name: String = ""
+    var order: Int = 0
+    var exercisesRaw: String = ""
+    var isCardio: Bool = false
 
     init(name: String, order: Int, exercises: [String], isCardio: Bool = false) {
         self.name = name
@@ -43,16 +43,17 @@ final class WorkoutTemplate {
 
 @Model
 final class WorkoutSession {
-    var date: Date
-    var templateName: String
-    var exercisesRaw: String
-    var finishedAt: Date?
-    var cardioMinutes: Int
-    var cardioNote: String
+    var date: Date = Date()
+    var templateName: String = ""
+    var exercisesRaw: String = ""
+    var finishedAt: Date? = nil
+    var cardioMinutes: Int = 0
+    var cardioNote: String = ""
     var cardioKindRaw: String = ""
     /// Saved when you finish (and editable); nil while the workout is going.
     var caloriesBurned: Int? = nil
-    @Relationship(deleteRule: .cascade, inverse: \SetLog.session) var sets: [SetLog] = []
+    /// Optional because iCloud sync requires it; read through `allSets`.
+    @Relationship(deleteRule: .cascade, inverse: \SetLog.session) var sets: [SetLog]? = []
 
     init(templateName: String, exercises: [String]) {
         self.date = .now
@@ -66,16 +67,18 @@ final class WorkoutSession {
     var exercises: [String] {
         exercisesRaw.split(separator: "\n").map(String.init)
     }
+
+    var allSets: [SetLog] { sets ?? [] }
 }
 
 @Model
 final class SetLog {
-    var exercise: String
-    var index: Int
-    var weight: Double
-    var reps: Int
-    var isDone: Bool
-    var date: Date
+    var exercise: String = ""
+    var index: Int = 0
+    var weight: Double = 0
+    var reps: Int = 0
+    var isDone: Bool = false
+    var date: Date = Date()
     var session: WorkoutSession?
 
     init(exercise: String, index: Int, weight: Double, reps: Int) {

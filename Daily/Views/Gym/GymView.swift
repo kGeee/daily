@@ -155,7 +155,7 @@ struct GymView: View {
                     .padding(.vertical, 8)
             }
             ForEach(finished) { session in
-                let doneSets = session.sets.filter { $0.isDone }.count
+                let doneSets = session.allSets.filter { $0.isDone }.count
                 let minutes = Int((session.finishedAt ?? session.date).timeIntervalSince(session.date) / 60)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
